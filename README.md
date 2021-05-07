@@ -5,8 +5,10 @@ Usage: mgcrl [options] URL
 Options:
   -c string
         volumes or chapters (default "1:-1")
+  -f string
+        automatically crawl manga according to the configuration file
   -m int
-        max retry time (default 5)
+        max retry time (default 3)
   -o string
         output directory (default ".")
   -v string
@@ -18,6 +20,8 @@ Options:
 Execute `mgcrl -c=1,-2:-1 http://www.700mh.com/manhua/1436` to download the first one and the last two chapters of 「The Promised Neverland」.
 
 Execute `mgcrl -v=单行本 -c=1:第03卷 https://www.mhgui.com/comic/4683/` to download the first three volumes of 「D.Gray-man」.
+
+For automated crawling, take `config.json` as an example.
 
 ## Supported Websites
 

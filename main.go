@@ -29,14 +29,18 @@ func main() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
 		flag.PrintDefaults()
 	}
-	var ver, selector, output string
+	var ver, selector, output, config string
 	var maxRetry int
 	flag.StringVar(&ver, "v", "", "manga version")
 	flag.StringVar(&selector, "c", "1:-1", "volumes or chapters")
 	flag.StringVar(&output, "o", ".", "output directory")
 	flag.IntVar(&maxRetry, "m", 3, "max retry time")
+	flag.StringVar(&config, "f", "", "automatically crawl manga according to the configuration file")
 	flag.Parse()
-	if flag.NArg() != 1 {
+	if len(config) != 0 {
+		com.AutoCrawl(config)
+		return
+	} else if flag.NArg() != 1 {
 		flag.Usage()
 		return
 	}
@@ -61,9 +65,9 @@ func main() {
 	}
 
 	if len(c.Chapters) > 1 {
-		fmt.Printf("(%d items) %s%s%s\n", len(c.Chapters), BLUE, c.Title, RESET)
+		fmt.Printf("%s%s%s (%d items)\n", BLUE, c.Title, RESET, len(c.Chapters))
 	} else {
-		fmt.Printf("(%d item) %s%s%s\n", len(c.Chapters), BLUE, c.Title, RESET)
+		fmt.Printf("%s%s%s (%d item)\n", BLUE, c.Title, RESET, len(c.Chapters))
 	}
 	for i := range c.Chapters {
 		prg, errs, done := c.FetchChapter(i)
