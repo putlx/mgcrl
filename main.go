@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"path"
 	"strconv"
 	"strings"
 
@@ -13,7 +11,19 @@ import (
 	"github.com/putlx/mgcrl/ext"
 )
 
+const (
+	RESET  = "\033[0m"
+	RED    = "\033[31m"
+	GREEN  = "\033[32m"
+	YELLOW = "\033[33m"
+	BLUE   = "\033[34m"
+	PURPLE = "\033[35m"
+)
+
 func main() {
+	enabled := true
+	defer colorable.EnableColorsStdout(&enabled)()
+
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Usage: mgcrl [options] URL")
 		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
@@ -24,61 +34,65 @@ func main() {
 	flag.StringVar(&ver, "v", "", "manga version")
 	flag.StringVar(&selector, "c", "1:-1", "volumes or chapters")
 	flag.StringVar(&output, "o", ".", "output directory")
-	flag.IntVar(&maxRetry, "m", 5, "max retry time")
+	flag.IntVar(&maxRetry, "m", 3, "max retry time")
 	flag.Parse()
 	if flag.NArg() != 1 {
 		flag.Usage()
 		return
 	}
 
-	enabled := true
-	defer colorable.EnableColorsStdout(&enabled)()
-
-	t, err := com.NewTask(flag.Args()[0], ver, output, maxRetry)
+	c, err := com.NewCrawler(flag.Args()[0], ver, output, maxRetry)
 	if err != nil {
-		fmt.Println("\033[31m" + err.Error() + "\033[0m")
+		fmt.Println(RED + err.Error() + RESET)
 		return
 	}
 
-	if len(t.Chapters) == 0 {
-		fmt.Println("\033[33mno volume/chapter found\033[0m")
+	if len(c.Chapters) == 0 {
+		fmt.Println(YELLOW + "no volume/chapter found" + RESET)
 		return
-	} else if cs, ok := filter(selector, t.Chapters); !ok {
-		fmt.Println("\033[31mbad range\033[0m")
+	} else if cs, ok := filter(selector, c.Chapters); !ok {
+		fmt.Println(RED + "bad range" + RESET)
 		return
 	} else if len(cs) == 0 {
-		fmt.Println("\033[33mno volume/chapter selected\033[0m")
+		fmt.Println(YELLOW + "no volume/chapter selected" + RESET)
 		return
 	} else {
-		t.Chapters = cs
+		c.Chapters = cs
 	}
 
-	err = os.MkdirAll(path.Join(output, t.Title), os.ModeDir)
-	if err != nil {
-		fmt.Println("\033[31m" + err.Error() + "\033[0m")
-		return
+	if len(c.Chapters) > 1 {
+		fmt.Printf("(%d items) %s%s%s\n", len(c.Chapters), BLUE, c.Title, RESET)
+	} else {
+		fmt.Printf("(%d item) %s%s%s\n", len(c.Chapters), BLUE, c.Title, RESET)
 	}
-
-	fmt.Printf("(\033[34m%03d\033[0m) \033[34m%s\033[0m\n", len(t.Chapters), t.Title)
-	for i := range t.Chapters {
-		progress, errs, err := t.GetChapter(i)
-		if err != nil {
-			fmt.Printf("[\033[31m%03d\033[0m / \033[31m%03d\033[0m]", i+1, len(t.Chapters))
-			fmt.Printf(" \033[34m%s\033[0m", t.Chapters[i].Title)
-			fmt.Printf(" \033[31m%s\033[0m\n", err)
-			continue
+	for i := range c.Chapters {
+		prg, errs, done := c.FetchChapter(i)
+		var errors []*com.Error
+	loop:
+		for hasPrg := false; ; {
+			select {
+			case s := <-prg:
+				fmt.Printf("\r[%s%03d%s / %s%03d%s] %s%s%s [%s%.1fMB%s / %s%.1fMB%s]",
+					GREEN, i+1, RESET, GREEN, len(c.Chapters), RESET,
+					BLUE, c.Chapters[i].Title, RESET,
+					PURPLE, float64(s.Size)/1048576, RESET,
+					PURPLE, float64(s.TotalSize)/1048576, RESET)
+				hasPrg = true
+			case err := <-errs:
+				errors = append(errors, err)
+			case <-done:
+				if hasPrg {
+					fmt.Println()
+				}
+				break loop
+			}
 		}
-		for s := range progress {
-			fmt.Print("\r")
-			fmt.Printf("[\033[32m%03d\033[0m / \033[32m%03d\033[0m]", i+1, len(t.Chapters))
-			fmt.Printf(" \033[34m%s\033[0m", t.Chapters[i].Title)
-			fmt.Printf(" [\033[35m%.1fMB\033[0m / \033[35m%.1fMB\033[0m]", float64(s.Size)/1048576, float64(s.TotalSize)/1048576)
-		}
-		fmt.Println()
-		for err := range errs {
-			fmt.Printf("[\033[31m%03d\033[0m / \033[31m%03d\033[0m]", i+1, len(t.Chapters))
-			fmt.Printf(" \033[34m%s\033[0m / \033[34m%s\033[0m", t.Chapters[i].Title, err.Filename)
-			fmt.Printf(" \033[31m%s\033[0m\n", err.Error)
+		for _, err := range errors {
+			fmt.Printf("[%s%03d%s / %s%03d%s] %s%s%s / %s%s%s : %s%s%s\n",
+				RED, i+1, RESET, RED, len(c.Chapters), RESET,
+				BLUE, c.Chapters[i].Title, RESET,
+				BLUE, err.Filename, RESET,
+				RED, err.Error, RESET)
 		}
 	}
 }
