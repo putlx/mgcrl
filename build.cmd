@@ -1,6 +1,6 @@
 @echo off
 
-if "%1%" == "" (
+if "%~1" == "" (
 	echo no version specified
 	goto :eof
 )
@@ -8,14 +8,14 @@ if "%1%" == "" (
 set GOARCH=amd64
 go build -buildmode=exe
 upx --best mgcrl.exe
-rename mgcrl.exe mgcrl_v%1%_windows_amd64.exe
+rename mgcrl.exe mgcrl_v%~1_windows_amd64.exe
 
 set GOARCH=386
 go build -buildmode=exe
 upx --best mgcrl.exe
-rename mgcrl.exe mgcrl_v%1%_windows_386.exe
+rename mgcrl.exe mgcrl_v%~1_windows_386.exe
 
-if "%2%" == "-gui" (
+if "%~2" == "-gui" (
 	cd gui
 	set GOARCH=amd64
 	go build -buildmode=exe -o=repl.exe
