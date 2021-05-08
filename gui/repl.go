@@ -12,7 +12,7 @@ type Status struct {
 	com.Progress
 	Index  int          `json:"index"`
 	Errors []*com.Error `json:"errors"`
-	Done   bool
+	Done   bool         `json:"done"`
 }
 
 type Request struct {

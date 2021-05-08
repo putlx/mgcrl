@@ -183,14 +183,15 @@ def update():
                 data[3] = f"{100 * s['size'] // s['total_size']} %"
             if s["errors"] is not None:
                 errmsg = ""
-                data[2] = "已完成" if len(s["errors"]) == 0 else "出错"
                 for e in s["errors"]:
                     if len(e["filename"]) != 0:
                         errmsg += e["filename"] + ": "
                     errmsg += e["error"] + "\n"
+            if s["done"]:
+                data[2] = "已完成" if s["errors"] is None else "出错"
             tasklist.item(tasklist.get_children()[s["index"]], values=data)
-            if s["errors"] is not None:
-                tasks[s["index"]] = errmsg
+            if s["done"]:
+                tasks[s["index"]] = errmsg if s["errors"] is not None else ""
 
 
 def show_log():
