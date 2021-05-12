@@ -9,6 +9,7 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/putlx/mgcrl/com"
 	"github.com/putlx/mgcrl/ext"
+	"github.com/putlx/mgcrl/webui"
 )
 
 const (
@@ -21,29 +22,33 @@ const (
 )
 
 func main() {
-	enabled := true
-	defer colorable.EnableColorsStdout(&enabled)()
-
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Usage: mgcrl [options] URL")
 		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
 		flag.PrintDefaults()
 	}
 	var ver, selector, output, config string
-	var maxRetry int
+	var maxRetry, port int
 	flag.StringVar(&ver, "v", "", "manga version")
 	flag.StringVar(&selector, "c", "1:-1", "volumes or chapters")
 	flag.StringVar(&output, "o", ".", "output directory")
 	flag.IntVar(&maxRetry, "m", 3, "max retry time")
 	flag.StringVar(&config, "f", "", "automatically crawl manga according to the configuration file")
+	flag.IntVar(&port, "p", 0, "launch webui at the port")
 	flag.Parse()
-	if len(config) != 0 {
+	if port != 0 {
+		webui.Serve(port)
+		return
+	} else if len(config) != 0 {
 		com.AutoCrawl(config)
 		return
 	} else if flag.NArg() != 1 {
 		flag.Usage()
 		return
 	}
+
+	enabled := true
+	defer colorable.EnableColorsStdout(&enabled)()
 
 	c, err := com.NewCrawler(flag.Args()[0], ver, output, maxRetry)
 	if err != nil {

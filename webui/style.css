@@ -1,0 +1,40 @@
+@media (orientation: landscape) {
+	body {
+		height: 100vh;
+	}
+	.main {
+		height: 90%;
+		display: flex;
+		flex-flow: row nowrap;
+	}
+	.control {
+		flex: 3;
+		display: flex;
+		flex-flow: column nowrap;
+	}
+	.tasks {
+		flex: 7;
+		margin-left: 2em;
+	}
+	#chapter-list {
+		flex-grow: 1;
+	}
+}
+@media (orientation: portrait) {
+	.control {
+		display: flex;
+		flex-flow: column nowrap;
+	}
+}
+.control > * {
+	margin-top: 0.4em;
+	margin-bottom: 0.4em;
+}
+.progress-bar.indeterminate {
+	position: relative;
+	animation: progress-indeterminate 3s linear infinite;
+}
+@keyframes progress-indeterminate {
+	from { left: -25%; width: 25%; }
+	to { left: 100%; width: 25%; }
+}

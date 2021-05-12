@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/css/bootstrap.min.css" rel="stylesheet">
+	<link href="style.css" rel="stylesheet">
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+	<script src="index.js"></script>
+	<title>mgcrl - WebUI</title>
+</head>
+
+<body>
+	<div class="d-flex justify-content-center" style="position: absolute; height: 100vh; width: 100vw; z-index: 1024;">
+		<div class="spinner-border" style="width: 3rem; height: 3rem; align-self: center;" role="status"></div>
+	</div>
+
+	<nav class="navbar navbar-expand-lg navbar-light bg-light" style="z-index: 1025;">
+		<div class="container-fluid">
+			<span class="navbar-brand mb-0 h1">mgcrl</span>
+			<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup"
+				aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+				<span class="navbar-toggler-icon"></span>
+			</button>
+			<div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+				<div class="navbar-nav">
+					<a class="nav-link active" aria-current="page" href="#">WebUI</a>
+					<a class="nav-link" href="#">AutoCrawl</a>
+					<a class="nav-link" href="https://github.com/putlx/mgcrl">GitHub</a>
+				</div>
+			</div>
+		</div>
+	</nav>
+
+	<div class="main p-4">
+		<div class="control">
+			<div class="input-group mb-3" id="url">
+				<input type="text" class="form-control" placeholder="链接" required>
+				<button class="btn btn-secondary" type="button">获取</button>
+			</div>
+			<div class="list-group overflow-scroll" id="chapter-list"></div>
+			<div class="btn-group" role="group">
+				<button type="button" class="btn btn-outline-secondary btn-sm">全选</button>
+				<button type="button" class="btn btn-outline-secondary btn-sm">全不选</button>
+			</div>
+			<input type="text" class="form-control" placeholder="目录" id="directory">
+			<button class="btn btn-primary" type="button">下载选中的章节</button>
+		</div>
+		<div class="tasks table-responsive" style="overflow-y: scroll;">
+			<table class="table table-sm align-middle">
+				<thead>
+					<tr>
+						<th scope="col" class="pe-4">漫画</th>
+						<th scope="col" class="pe-4">章节</th>
+						<th scope="col" class="pe-4">大小</th>
+						<th scope="col" class="pe-4">已下载</th>
+						<th scope="col" class="pe-4">进度</th>
+						<th scope="col" class="pe-4">移除</th>
+					</tr>
+				</thead>
+				<tbody style="white-space: nowrap;"></tbody>
+			</table>
+		</div>
+	</div>
+
+	<div class="toast-container" style="position: absolute; right: 1em; bottom: 1em; z-index: 2048;"></div>
+</body>
+
+</html>
