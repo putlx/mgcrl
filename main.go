@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -22,35 +23,66 @@ const (
 )
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), "Usage: mgcrl [options] URL")
+	dlFlags := flag.NewFlagSet("get", flag.ExitOnError)
+	svFlags := flag.NewFlagSet("serve", flag.ExitOnError)
+	dlFlags.Usage = func() {
+		fmt.Fprintln(flag.CommandLine.Output(), "Usage: mgcrl get <URL> [options]")
 		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
-		flag.PrintDefaults()
+		dlFlags.PrintDefaults()
 	}
-	var ver, selector, output, config string
-	var maxRetry, port int
-	flag.StringVar(&ver, "v", "", "manga version")
-	flag.StringVar(&selector, "c", "1:-1", "volumes or chapters")
-	flag.StringVar(&output, "o", ".", "output directory")
-	flag.IntVar(&maxRetry, "m", 3, "max retry time")
-	flag.StringVar(&config, "f", "", "automatically crawl manga according to the configuration file")
-	flag.IntVar(&port, "p", 0, "launch webui at the port")
-	flag.Parse()
-	if port != 0 {
-		webui.Serve(port)
-		return
-	} else if len(config) != 0 {
-		com.AutoCrawl(config)
-		return
-	} else if flag.NArg() != 1 {
-		flag.Usage()
-		return
+	svFlags.Usage = func() {
+		fmt.Fprintln(flag.CommandLine.Output(), "Usage: mgcrl serve <PORT> [options]")
+		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
+		svFlags.PrintDefaults()
 	}
+	flag.Usage = func() {
+		fmt.Fprintln(flag.CommandLine.Output(), "Usage: mgcrl get <URL> [options]")
+		fmt.Fprintln(flag.CommandLine.Output(), "       mgcrl serve <PORT> [options]")
+		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions for get:")
+		dlFlags.PrintDefaults()
+		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions for serve:")
+		svFlags.PrintDefaults()
+	}
+	var version, selector, output, config string
+	var maxRetry int
+	dlFlags.StringVar(&version, "v", "", "manga version")
+	dlFlags.StringVar(&selector, "c", "1:-1", "volumes or chapters")
+	dlFlags.StringVar(&output, "o", ".", "output directory")
+	dlFlags.IntVar(&maxRetry, "m", 3, "max retry time")
+	svFlags.StringVar(&config, "f", "", "auto crawl manga according to the config file")
 
 	enabled := true
 	defer colorable.EnableColorsStdout(&enabled)()
 
-	c, err := com.NewCrawler(flag.Args()[0], ver, output, maxRetry)
+	if len(os.Args) < 2 || os.Args[1] == "-h" || os.Args[1] == "-help" {
+		flag.Usage()
+		return
+	} else if os.Args[1] == "serve" {
+		if len(os.Args) < 3 {
+			svFlags.Usage()
+		} else if port, err := strconv.Atoi(os.Args[2]); err != nil {
+			fmt.Println(RED + "invalid port" + RESET)
+		} else if err := svFlags.Parse(os.Args[3:]); err != nil {
+			fmt.Println(RED + err.Error() + RESET)
+		} else {
+			if len(config) != 0 {
+				go com.AutoCrawl(config)
+			}
+			webui.Serve(port)
+		}
+		return
+	} else if os.Args[1] != "get" {
+		fmt.Println(RED + os.Args[1] + ": unknown command" + RESET)
+		return
+	} else if len(os.Args) < 3 || strings.HasPrefix(os.Args[2], "-") {
+		dlFlags.Usage()
+		return
+	} else if err := dlFlags.Parse(os.Args[3:]); err != nil {
+		fmt.Println(RED + err.Error() + RESET)
+		return
+	}
+
+	c, err := com.NewCrawler(os.Args[2], version, output, maxRetry)
 	if err != nil {
 		fmt.Println(RED + err.Error() + RESET)
 		return

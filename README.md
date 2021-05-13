@@ -1,29 +1,31 @@
 ## Usage
 
 ```
-Usage: mgcrl [options] URL
-Options:
+Usage: mgcrl get <URL> [options]
+       mgcrl serve <PORT> [options]
+
+Options for get:
   -c string
         volumes or chapters (default "1:-1")
-  -f string
-        automatically crawl manga according to the configuration file
   -m int
         max retry time (default 3)
   -o string
         output directory (default ".")
-  -p int
-        launch webui at the port
   -v string
         manga version
+
+Options for serve:
+  -f string
+        auto crawl manga according to the config file
 ```
 
 ## Example
 
-Execute `mgcrl -c=1,-2:-1 http://www.700mh.com/manhua/1436` to download the first one and the last two chapters of 「The Promised Neverland」.
+Execute `mgcrl get http://www.700mh.com/manhua/1436 -c=1,-2:-1` to download the first one and the last two chapters of 「The Promised Neverland」.
 
-Execute `mgcrl -v=单行本 -c=1:第03卷 https://www.mhgui.com/comic/4683/` to download the first three volumes of 「D.Gray-man」.
+Execute `mgcrl get https://www.mhgui.com/comic/4683/ -v=单行本 -c=1:第03卷` to download the first three volumes of 「D.Gray-man」.
 
-Execute `mgcrl -p port` and open `http://localhost:port/` in your browser to access WebUI.
+Execute `mgcrl serve <PORT>` and open `http://localhost:<PORT>/` in your browser to access WebUI.
 
 For automated crawling, take `config.json` as an example.
 
