@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/putlx/mgcrl/com"
 	"github.com/putlx/mgcrl/ext"
+	"github.com/putlx/mgcrl/util"
 	"github.com/putlx/mgcrl/webui"
 )
 
@@ -43,13 +45,14 @@ func main() {
 		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions for serve:")
 		svFlags.PrintDefaults()
 	}
-	var version, selector, output, config string
+	var version, selector, output, config, log string
 	var maxRetry int
 	dlFlags.StringVar(&version, "v", "", "manga version")
 	dlFlags.StringVar(&selector, "c", "1:-1", "volumes or chapters")
 	dlFlags.StringVar(&output, "o", ".", "output directory")
 	dlFlags.IntVar(&maxRetry, "m", 3, "max retry time")
 	svFlags.StringVar(&config, "f", "", "auto crawl manga according to the config file")
+	svFlags.StringVar(&log, "l", "", "redirect log to file")
 
 	enabled := true
 	defer colorable.EnableColorsStdout(&enabled)()
@@ -65,10 +68,19 @@ func main() {
 		} else if err := svFlags.Parse(os.Args[3:]); err != nil {
 			fmt.Println(RED + err.Error() + RESET)
 		} else {
-			if len(config) != 0 {
-				go com.AutoCrawl(config)
+			var w io.Writer = os.Stderr
+			if len(log) != 0 {
+				f, err := os.OpenFile(log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				if err != nil {
+					fmt.Println(RED + err.Error() + RESET)
+					return
+				}
+				w = util.NewWriter(f)
 			}
-			webui.Serve(port)
+			if len(config) != 0 {
+				go com.AutoCrawl(config, w)
+			}
+			webui.Serve(port, w)
 		}
 		return
 	} else if os.Args[1] != "get" {

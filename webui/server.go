@@ -36,12 +36,12 @@ type Task struct {
 var tasks = &sync.Map{}
 var upgrader = websocket.Upgrader{}
 
-func WriteJSON(w http.ResponseWriter, v interface{}) {
+func WriteJSON(w http.ResponseWriter, v interface{}, lg *log.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if data, err := json.Marshal(v); err != nil {
-		log.Fatalln(err)
+		lg.Fatalln(err)
 	} else if _, err = io.WriteString(w, string(data)); err != nil {
-		log.Println(err)
+		lg.Println(err)
 	}
 }
 
@@ -54,7 +54,7 @@ func ReadJSON(req *http.Request, v interface{}) error {
 	return nil
 }
 
-func Serve(port int) {
+func Serve(port int, w io.Writer) {
 	var id = make(chan int)
 	var tc = make(chan Task)
 	var crawler atomic.Value
@@ -63,6 +63,8 @@ func Serve(port int) {
 			id <- i
 		}
 	}()
+
+	lg := log.New(w, "[webui] ", log.LstdFlags|log.Lmsgprefix)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -82,11 +84,11 @@ func Serve(port int) {
 	http.HandleFunc("/get", func(w http.ResponseWriter, req *http.Request) {
 		var URL string
 		if err := ReadJSON(req, &URL); err != nil {
-			WriteJSON(w, err.Error())
+			WriteJSON(w, err.Error(), lg)
 		} else if c, err := com.NewCrawler(URL, "", ".", 3); err != nil {
-			WriteJSON(w, err.Error())
+			WriteJSON(w, err.Error(), lg)
 		} else {
-			WriteJSON(w, c.Chapters)
+			WriteJSON(w, c.Chapters, lg)
 			crawler.Store(c)
 		}
 	})
@@ -94,10 +96,10 @@ func Serve(port int) {
 	http.HandleFunc("/delete", func(w http.ResponseWriter, req *http.Request) {
 		var ID int
 		if err := ReadJSON(req, &ID); err != nil {
-			WriteJSON(w, err.Error())
+			WriteJSON(w, err.Error(), lg)
 		} else {
 			tasks.Delete(ID)
-			WriteJSON(w, nil)
+			WriteJSON(w, nil, lg)
 		}
 	})
 
@@ -107,7 +109,7 @@ func Serve(port int) {
 			Output  string
 		}
 		if err := ReadJSON(req, &r); err != nil {
-			WriteJSON(w, err.Error())
+			WriteJSON(w, err.Error(), lg)
 		} else {
 			c := *crawler.Load().(*com.Crawler)
 			if len(r.Output) != 0 {
@@ -146,14 +148,14 @@ func Serve(port int) {
 					}
 				}(idx, &c)
 			}
-			WriteJSON(w, nil)
+			WriteJSON(w, nil, lg)
 		}
 	})
 
 	http.HandleFunc("/downloading", func(w http.ResponseWriter, req *http.Request) {
 		c, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
-			log.Fatalln(err)
+			lg.Fatalln(err)
 		}
 		defer c.Close()
 		tasks.Range(func(key, value interface{}) bool {
@@ -162,16 +164,16 @@ func Serve(port int) {
 			t := *v
 			v.mutex.Unlock()
 			if err := c.WriteJSON(t); err != nil {
-				log.Println(err)
+				lg.Println(err)
 			}
 			return true
 		})
 		for {
 			if err := c.WriteJSON(<-tc); err != nil {
-				log.Println(err)
+				lg.Println(err)
 			}
 		}
 	})
 
-	log.Fatalln(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
+	lg.Fatalln(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }

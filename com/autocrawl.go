@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -42,22 +43,23 @@ func (c *Config) WriteTo(filename string) error {
 	return nil
 }
 
-func AutoCrawl(filename string) {
+func AutoCrawl(filename string, w io.Writer) {
 	const maxTry = 4
 	const duration = time.Duration(10) * time.Minute
 
+	lg := log.New(w, "[autocrawl] ", log.LstdFlags|log.Lmsgprefix)
 	config := &Config{}
 	if err := config.Read(filename); err != nil {
-		beeep.Notify("mgcrl - Error", err.Error(), "")
-		log.Fatalln(err)
+		beeep.Notify("错误", err.Error(), "")
+		lg.Fatalln(err)
 	}
 	if len(config.Output) == 0 {
 		config.Output = "."
-		log.Println("set output to .")
+		lg.Println("set output to .")
 	}
 	if config.Frequency == 0 {
 		config.Frequency = 12
-		log.Println("set frequency to 12 hours")
+		lg.Println("set frequency to 12 hours")
 	}
 
 	for {
@@ -68,23 +70,24 @@ func AutoCrawl(filename string) {
 			for t := 0; ; t++ {
 				if t != 0 {
 					time.Sleep(duration)
-					log.Printf("retry getting %s\n", a.URL)
+					lg.Println("retry getting " + a.URL)
 				}
 				c, err = NewCrawler(a.URL, a.Version, config.Output, maxTry)
 				if err == nil {
 					break
 				}
-				log.Println(err)
+				lg.Println(err)
 			}
 
 			if c == nil {
+				lg.Println("fail to get " + a.URL)
 				continue
 			} else if len(a.LastChapter) == 0 {
 				if len(c.Chapters) > 0 {
 					a.LastChapter = c.Chapters[len(c.Chapters)-1].Title
 					if err := config.WriteTo(filename); err != nil {
-						log.Println(err)
-						beeep.Notify("mgcrl - Error", err.Error(), "")
+						lg.Println(err)
+						beeep.Notify("错误", err.Error(), "")
 					}
 				}
 				continue
@@ -101,7 +104,7 @@ func AutoCrawl(filename string) {
 				for t := 0; t < maxTry; t++ {
 					if t != 0 {
 						time.Sleep(duration)
-						log.Printf("retry crawling 「%s / %s」\n", c.Title, c.Chapters[idx].Title)
+						lg.Printf("retry crawling 「%s / %s」\n", c.Title, c.Chapters[idx].Title)
 					}
 					prg, errs, done := c.FetchChapter(idx)
 					var err *Error
@@ -110,19 +113,19 @@ func AutoCrawl(filename string) {
 						select {
 						case <-prg:
 						case err = <-errs:
-							log.Println(err)
+							lg.Println(err)
 						case <-done:
 							break loop
 						}
 					}
 					if err == nil {
 						title := fmt.Sprintf("「%s / %s」", c.Title, c.Chapters[idx].Title)
-						log.Println(title + " is downloaded")
-						beeep.Notify("mgcrl - Notification", title+"下载完毕。", "")
+						lg.Println(title + " is downloaded")
+						beeep.Notify("下载完成", title+"下载完毕。", "")
 						a.LastChapter = c.Chapters[idx].Title
 						if err := config.WriteTo(filename); err != nil {
-							log.Println(err)
-							beeep.Notify("mgcrl - Error", err.Error(), "")
+							lg.Println(err)
+							beeep.Notify("错误", err.Error(), "")
 						}
 						break
 					}

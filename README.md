@@ -17,6 +17,8 @@ Options for get:
 Options for serve:
   -f string
         auto crawl manga according to the config file
+  -l string
+        redirect log to file
 ```
 
 ## Example
