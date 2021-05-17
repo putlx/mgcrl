@@ -2,7 +2,7 @@ package util
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -47,7 +47,7 @@ func GetResponse(URL string, referer *string) (*http.Response, error) {
 	}
 	if resp.StatusCode != 200 {
 		resp.Body.Close()
-		return nil, errors.New("response status " + resp.Status)
+		return nil, fmt.Errorf("get %s: %s", URL, resp.Status)
 	}
 	return resp, nil
 }
