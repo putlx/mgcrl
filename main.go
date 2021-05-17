@@ -184,16 +184,15 @@ func filter(selector string, chapters []ext.Chapter) ([]ext.Chapter, bool) {
 				end = i + 1
 			}
 		}
-		if begin == -1 {
-			begin = len(chapters)
-		}
-		if len(s) == 2 {
-			if end == -1 {
-				end = len(chapters)
+		if begin != -1 {
+			if len(s) == 2 {
+				if end == -1 {
+					end = len(chapters)
+				}
+				cs = append(cs, chapters[begin:end]...)
+			} else {
+				cs = append(cs, chapters[begin])
 			}
-			cs = append(cs, chapters[begin:end]...)
-		} else {
-			cs = append(cs, chapters[begin])
 		}
 	}
 	return cs, true
