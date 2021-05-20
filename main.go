@@ -70,12 +70,7 @@ func main() {
 		} else {
 			var w io.Writer = os.Stderr
 			if len(log) != 0 {
-				f, err := os.OpenFile(log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-				if err != nil {
-					fmt.Println(RED + err.Error() + RESET)
-					return
-				}
-				w = util.NewWriter(f)
+				w = util.NewWriter(log)
 			}
 			if len(config) != 0 {
 				go com.AutoCrawl(config, w)

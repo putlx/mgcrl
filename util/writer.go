@@ -1,19 +1,22 @@
 package util
 
 import (
-	"bufio"
-	"io"
+	"os"
 )
 
 type Writer struct {
-	w *bufio.Writer
+	f string
 }
 
-func NewWriter(w io.Writer) *Writer {
-	return &Writer{bufio.NewWriter(w)}
+func NewWriter(f string) *Writer {
+	return &Writer{f}
 }
 
 func (w *Writer) Write(p []byte) (nn int, err error) {
-	defer w.w.Flush()
-	return w.w.Write(p)
+	f, err := os.OpenFile(w.f, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	return f.Write(p)
 }
