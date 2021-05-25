@@ -21,6 +21,8 @@ Options for serve:
         redirect log to file
 ```
 
+Option `-c` is followed by argument with the format of `from[:to][,from[:to]]...` where `from` and `to` can both be chapter title or index.
+
 ## Example
 
 Execute `mgcrl get http://www.700mh.com/manhua/1436 -c=1,-2:-1` to download the first one and the last two chapters of 「The Promised Neverland」.
