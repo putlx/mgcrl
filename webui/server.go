@@ -15,13 +15,19 @@ import (
 )
 
 //go:embed index.html
-var html string
+var html []byte
 
 //go:embed index.js
-var js string
+var js []byte
 
 //go:embed style.css
-var css string
+var css []byte
+
+//go:embed reader.html
+var reader []byte
+
+//go:embed favicon.ico
+var favicon []byte
 
 type Task struct {
 	ID      int          `json:"id"`
@@ -68,17 +74,28 @@ func Serve(port int, w io.Writer) {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		io.WriteString(w, html)
+		w.Write(html)
 	})
 
 	http.HandleFunc("/index.js", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-		io.WriteString(w, fmt.Sprintf("const port = %d;\n\n%s", port, js))
+		w.Write([]byte(fmt.Sprintf("const port = %d;\n\n", port)))
+		w.Write(js)
 	})
 
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-		io.WriteString(w, css)
+		w.Write(css)
+	})
+
+	http.HandleFunc("/reader", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(reader)
+	})
+
+	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "image/x-icon")
+		w.Write(favicon)
 	})
 
 	http.HandleFunc("/get", func(w http.ResponseWriter, req *http.Request) {

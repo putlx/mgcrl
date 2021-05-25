@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh">
 
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="icon" href="favicon.ico">
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/css/bootstrap.min.css" rel="stylesheet">
 	<link href="style.css" rel="stylesheet">
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -19,16 +20,22 @@
 
 	<nav class="navbar navbar-expand-lg navbar-light bg-light" style="z-index: 1025;">
 		<div class="container-fluid">
-			<span class="navbar-brand mb-0 h1">mgcrl</span>
-			<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup"
-				aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+			<a class="navbar-brand">mgcrl</a>
+			<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarScroll">
 				<span class="navbar-toggler-icon"></span>
 			</button>
-			<div class="collapse navbar-collapse" id="navbarNavAltMarkup">
-				<div class="navbar-nav">
-					<a class="nav-link active" aria-current="page" href="#">WebUI</a>
-					<a class="nav-link" href="https://github.com/putlx/mgcrl">GitHub</a>
-				</div>
+			<div class="collapse navbar-collapse" id="navbarScroll">
+				<ul class="navbar-nav me-auto my-2 my-lg-0" style="--bs-scroll-height: 100px;">
+					<li class="nav-item">
+						<a class="nav-link active" href="#">WebUI</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link" href="/reader">Reader</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link" href="https://github.com/putlx/mgcrl">GitHub</a>
+					</li>
+				</ul>
 			</div>
 		</div>
 	</nav>
