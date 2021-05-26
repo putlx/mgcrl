@@ -50,6 +50,9 @@
 		window.addEventListener("load", function () {
 			const view = document.getElementById("view");
 			document.getElementById("file").addEventListener("change", function (event) {
+				if (!event.target.files.length) {
+					return;
+				}
 				view.innerHTML = "";
 				[...event.target.files].forEach(file => {
 					if (file.name.match(/\.zip$/i)) {
