@@ -17,7 +17,7 @@ function unlockPage() {
 window.addEventListener("load", function () {
 	lockPage();
 
-	const socket = new WebSocket(`ws://localhost:${port}/downloading`);
+	const socket = new WebSocket(`${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/downloading`);
 	socket.onopen = unlockPage;
 	socket.onerror = function (event) {
 		toast("连接错误。");

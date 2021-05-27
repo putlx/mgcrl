@@ -79,7 +79,6 @@ func Serve(port int, w io.Writer) {
 
 	http.HandleFunc("/index.js", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-		w.Write([]byte(fmt.Sprintf("const port = %d;\n\n", port)))
 		w.Write(js)
 	})
 
