@@ -26,6 +26,9 @@ var css []byte
 //go:embed reader.html
 var reader []byte
 
+//go:embed toast.js
+var toast []byte
+
 //go:embed favicon.ico
 var favicon []byte
 
@@ -80,6 +83,11 @@ func Serve(port int, w io.Writer) {
 	http.HandleFunc("/index.js", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 		w.Write(js)
+	})
+
+	http.HandleFunc("/toast.js", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		w.Write(toast)
 	})
 
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, req *http.Request) {
