@@ -75,7 +75,7 @@ func main() {
 			if len(config) != 0 {
 				go com.AutoCrawl(config, w)
 			}
-			webui.Serve(port, config, w)
+			webui.Serve(port, config, log, w)
 		}
 		return
 	} else if os.Args[1] != "get" {

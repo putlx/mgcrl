@@ -1,12 +1,16 @@
 package webui
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"regexp"
 	"sync"
 	"sync/atomic"
 
@@ -25,6 +29,9 @@ var css []byte
 
 //go:embed reader.html
 var reader []byte
+
+//go:embed log.html
+var logHtml []byte
 
 //go:embed toast.js
 var toast []byte
@@ -67,7 +74,7 @@ func ReadJSON(req *http.Request, v interface{}) error {
 	return nil
 }
 
-func Serve(port int, config string, w io.Writer) {
+func Serve(port int, config, logFile string, w io.Writer) {
 	var id = make(chan int)
 	var tc = make(chan Task)
 	var crawler atomic.Value
@@ -107,6 +114,33 @@ func Serve(port int, config string, w io.Writer) {
 	http.HandleFunc("/autocrawl", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(autocrawl)
+	})
+
+	http.HandleFunc("/log", func(w http.ResponseWriter, req *http.Request) {
+		idx := bytes.IndexAny(logHtml, "{{}}")
+		if idx == -1 {
+			panic(errors.New("unable to locate the table body in log.html"))
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if f, err := os.Open(logFile); err != nil {
+			w.Write([]byte(err.Error()))
+		} else if data, err := io.ReadAll(f); err != nil {
+			w.Write([]byte(err.Error()))
+		} else {
+			w.Write(logHtml[:idx])
+			for _, row := range bytes.Split(data, []byte("\n")) {
+				if len(row) > 0 {
+					w.Write([]byte(`<tr>`))
+					for _, m := range regexp.MustCompile(`(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)`).FindSubmatch(row)[1:] {
+						w.Write([]byte(`<td class="pe-4">`))
+						w.Write(m)
+						w.Write([]byte(`</td>`))
+					}
+					w.Write([]byte(`</tr>`))
+				}
+			}
+			w.Write(logHtml[idx+4:])
+		}
 	})
 
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, req *http.Request) {
