@@ -2,7 +2,6 @@ package com
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -23,15 +22,20 @@ type Config struct {
 	Output    string `json:"output"`
 }
 
-func (c *Config) Read(filename string) error {
+func NewConfig(filename string) (*Config, error) {
+	var c *Config
 	if data, err := os.ReadFile(filename); err != nil {
-		return err
+		return nil, err
 	} else if err = json.Unmarshal(data, c); err != nil {
-		return err
-	} else if len(c.Assets) == 0 {
-		return errors.New("no asset")
+		return nil, err
 	}
-	return nil
+	if len(c.Output) == 0 {
+		c.Output = "."
+	}
+	if c.Frequency <= 0 {
+		c.Frequency = 6
+	}
+	return c, nil
 }
 
 func (c *Config) WriteTo(filename string) error {
@@ -48,21 +52,14 @@ func AutoCrawl(filename string, w io.Writer) {
 	const duration = time.Duration(10) * time.Minute
 
 	lg := log.New(w, "[autocrawl] ", log.LstdFlags|log.Lmsgprefix)
-	config := &Config{}
-	if err := config.Read(filename); err != nil {
-		beeep.Notify("错误", err.Error(), "")
-		lg.Fatalln(err)
-	}
-	if len(config.Output) == 0 {
-		config.Output = "."
-		lg.Println("set output to .")
-	}
-	if config.Frequency == 0 {
-		config.Frequency = 12
-		lg.Println("set frequency to 12 hours")
-	}
 
 	for {
+		config, err := NewConfig(filename)
+		if err != nil {
+			beeep.Notify("错误", err.Error(), "")
+			lg.Fatalln(err)
+		}
+
 		for i := range config.Assets {
 			a := &config.Assets[i]
 			var c *Crawler
