@@ -11,22 +11,24 @@ import (
 	"github.com/gen2brain/beeep"
 )
 
+type Asset struct {
+	Name        string `json:"name"`
+	URL         string `json:"url"`
+	Version     string `json:"version"`
+	LastChapter string `json:"last_chapter"`
+}
+
 type Config struct {
-	Assets []struct {
-		Name        string `json:"name"`
-		URL         string `json:"url"`
-		Version     string `json:"version"`
-		LastChapter string `json:"last_chapter"`
-	} `json:"assets"`
-	Frequency int    `json:"frequency_in_hour"`
-	Output    string `json:"output"`
+	Assets    []Asset `json:"assets"`
+	Frequency int     `json:"frequency_in_hour"`
+	Output    string  `json:"output"`
 }
 
 func NewConfig(filename string) (*Config, error) {
-	var c *Config
+	var c Config
 	if data, err := os.ReadFile(filename); err != nil {
 		return nil, err
-	} else if err = json.Unmarshal(data, c); err != nil {
+	} else if err = json.Unmarshal(data, &c); err != nil {
 		return nil, err
 	}
 	if len(c.Output) == 0 {
@@ -35,7 +37,7 @@ func NewConfig(filename string) (*Config, error) {
 	if c.Frequency <= 0 {
 		c.Frequency = 6
 	}
-	return c, nil
+	return &c, nil
 }
 
 func (c *Config) WriteTo(filename string) error {

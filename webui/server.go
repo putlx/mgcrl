@@ -29,6 +29,9 @@ var reader []byte
 //go:embed toast.js
 var toast []byte
 
+//go:embed autocrawl.html
+var autocrawl []byte
+
 //go:embed favicon.ico
 var favicon []byte
 
@@ -44,8 +47,9 @@ type Task struct {
 
 var tasks = &sync.Map{}
 var upgrader = websocket.Upgrader{}
+var lg *log.Logger
 
-func WriteJSON(w http.ResponseWriter, v interface{}, lg *log.Logger) {
+func WriteJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if data, err := json.Marshal(v); err != nil {
 		lg.Fatalln(err)
@@ -63,7 +67,7 @@ func ReadJSON(req *http.Request, v interface{}) error {
 	return nil
 }
 
-func Serve(port int, w io.Writer) {
+func Serve(port int, config string, w io.Writer) {
 	var id = make(chan int)
 	var tc = make(chan Task)
 	var crawler atomic.Value
@@ -73,7 +77,7 @@ func Serve(port int, w io.Writer) {
 		}
 	}()
 
-	lg := log.New(w, "[webui] ", log.LstdFlags|log.Lmsgprefix)
+	lg = log.New(w, "[webui] ", log.LstdFlags|log.Lmsgprefix)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -100,6 +104,11 @@ func Serve(port int, w io.Writer) {
 		w.Write(reader)
 	})
 
+	http.HandleFunc("/autocrawl", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(autocrawl)
+	})
+
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "image/x-icon")
 		w.Write(favicon)
@@ -108,11 +117,11 @@ func Serve(port int, w io.Writer) {
 	http.HandleFunc("/get", func(w http.ResponseWriter, req *http.Request) {
 		var URL string
 		if err := ReadJSON(req, &URL); err != nil {
-			WriteJSON(w, err.Error(), lg)
+			WriteJSON(w, err.Error())
 		} else if c, err := com.NewCrawler(URL, "", ".", 3); err != nil {
-			WriteJSON(w, err.Error(), lg)
+			WriteJSON(w, err.Error())
 		} else {
-			WriteJSON(w, c.Chapters, lg)
+			WriteJSON(w, c.Chapters)
 			crawler.Store(c)
 		}
 	})
@@ -120,10 +129,10 @@ func Serve(port int, w io.Writer) {
 	http.HandleFunc("/delete", func(w http.ResponseWriter, req *http.Request) {
 		var ID int
 		if err := ReadJSON(req, &ID); err != nil {
-			WriteJSON(w, err.Error(), lg)
+			WriteJSON(w, err.Error())
 		} else {
 			tasks.Delete(ID)
-			WriteJSON(w, nil, lg)
+			WriteJSON(w, nil)
 		}
 	})
 
@@ -133,7 +142,7 @@ func Serve(port int, w io.Writer) {
 			Output  string
 		}
 		if err := ReadJSON(req, &r); err != nil {
-			WriteJSON(w, err.Error(), lg)
+			WriteJSON(w, err.Error())
 		} else {
 			c := *crawler.Load().(*com.Crawler)
 			if len(r.Output) != 0 {
@@ -172,7 +181,7 @@ func Serve(port int, w io.Writer) {
 					}
 				}(idx, &c)
 			}
-			WriteJSON(w, nil, lg)
+			WriteJSON(w, nil)
 		}
 	})
 
@@ -195,6 +204,43 @@ func Serve(port int, w io.Writer) {
 		for {
 			if err := c.WriteJSON(<-tc); err != nil {
 				lg.Println(err)
+			}
+		}
+	})
+
+	http.HandleFunc("/config", func(w http.ResponseWriter, req *http.Request) {
+		if len(config) == 0 {
+			WriteJSON(w, nil)
+		} else if req.Method == "GET" {
+			if c, err := com.NewConfig(config); err != nil {
+				WriteJSON(w, err.Error())
+			} else {
+				WriteJSON(w, c)
+			}
+		} else {
+			var u struct {
+				Remove    int    `json:"remove"`
+				Frequency int    `json:"frequency_in_hour"`
+				Output    string `json:"output"`
+				com.Asset
+			}
+			if err := ReadJSON(req, &u); err != nil {
+				WriteJSON(w, err.Error())
+			} else if c, err := com.NewConfig(config); err != nil {
+				WriteJSON(w, err.Error())
+			} else {
+				c.Output = u.Output
+				c.Frequency = u.Frequency
+				if u.Remove > 0 {
+					c.Assets = append(c.Assets[:u.Remove-1], c.Assets[u.Remove:]...)
+				} else if len(u.URL) > 0 {
+					c.Assets = append([]com.Asset{u.Asset}, c.Assets...)
+				}
+				if err = c.WriteTo(config); err != nil {
+					WriteJSON(w, err.Error())
+				} else {
+					WriteJSON(w, nil)
+				}
 			}
 		}
 	})
