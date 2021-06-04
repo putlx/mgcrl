@@ -123,7 +123,12 @@ func Serve(port int, config, logFile string, w io.Writer) {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if f, err := os.Open(logFile); err != nil {
-			w.Write([]byte(err.Error()))
+			if os.IsNotExist(err) {
+				w.Write(logHtml[:idx])
+				w.Write(logHtml[idx+4:])
+			} else {
+				w.Write([]byte(err.Error()))
+			}
 		} else if data, err := io.ReadAll(f); err != nil {
 			w.Write([]byte(err.Error()))
 		} else {
