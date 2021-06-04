@@ -117,7 +117,7 @@ func Serve(port int, config, logFile string, w io.Writer) {
 	})
 
 	http.HandleFunc("/log", func(w http.ResponseWriter, req *http.Request) {
-		idx := bytes.IndexAny(logHtml, "{{}}")
+		idx := bytes.Index(logHtml, []byte("{{}}"))
 		if idx == -1 {
 			panic(errors.New("unable to locate the table body in log.html"))
 		}
