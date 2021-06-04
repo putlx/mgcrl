@@ -226,7 +226,8 @@ func Serve(port int, config, logFile string, w io.Writer) {
 	http.HandleFunc("/downloading", func(w http.ResponseWriter, req *http.Request) {
 		c, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
-			lg.Fatalln(err)
+			lg.Println(err)
+			return
 		}
 		defer c.Close()
 		tasks.Range(func(key, value interface{}) bool {
