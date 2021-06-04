@@ -141,7 +141,7 @@
 					console.log(error);
 				});
 
-			document.querySelector("tbody tr th button").onclick = function () {
+			document.querySelector("tbody tr td button").onclick = function () {
 				if (!config) return toast("未指定配置文件。");
 				const group = document.querySelector("tbody tr");
 				const asset = {
