@@ -131,7 +131,7 @@ func Serve(port int, config, logFile string, w io.Writer) {
 			for _, row := range bytes.Split(data, []byte("\n")) {
 				if len(row) > 0 {
 					w.Write([]byte(`<tr>`))
-					for _, m := range regexp.MustCompile(`(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)`).FindSubmatch(row)[1:] {
+					for _, m := range regexp.MustCompile(`(\d{4}/\d{2}/\d{2}) (\d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)`).FindSubmatch(row)[1:] {
 						w.Write([]byte(`<td class="pe-4">`))
 						w.Write(m)
 						w.Write([]byte(`</td>`))
