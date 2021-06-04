@@ -128,7 +128,11 @@ func Serve(port int, config, logFile string, w io.Writer) {
 			w.Write([]byte(err.Error()))
 		} else {
 			w.Write(logHtml[:idx])
-			for _, row := range bytes.Split(data, []byte("\n")) {
+			rows := bytes.Split(data, []byte("\n"))
+			for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+				rows[i], rows[j] = rows[j], rows[i]
+			}
+			for _, row := range rows {
 				if len(row) > 0 {
 					w.Write([]byte(`<tr>`))
 					for _, m := range regexp.MustCompile(`(\d{4}/\d{2}/\d{2}) (\d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)`).FindSubmatch(row)[1:] {
