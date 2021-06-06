@@ -148,10 +148,10 @@
 				if (!config) return toast("未指定配置文件。");
 				const group = document.querySelector("tbody tr");
 				const asset = {
-					name: group.querySelector("th:nth-child(1) input").value.trim(),
-					url: group.querySelector("th:nth-child(2) input").value.trim(),
-					version: group.querySelector("th:nth-child(3) input").value.trim(),
-					last_chapter: group.querySelector("th:nth-child(4) input").value.trim()
+					name: group.querySelector("td:nth-child(1) input").value.trim(),
+					url: group.querySelector("td:nth-child(2) input").value.trim(),
+					version: group.querySelector("td:nth-child(3) input").value.trim(),
+					last_chapter: group.querySelector("td:nth-child(4) input").value.trim()
 				};
 				if (!asset.url) return toast("链接不可为空");
 				fetch("/config", {
