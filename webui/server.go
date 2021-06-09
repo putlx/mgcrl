@@ -118,6 +118,15 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 	})
 
 	http.HandleFunc("/log", func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == "POST" && len(logFile) != 0 {
+			if _, err := os.Stat(logFile); err == nil {
+				if err = os.Remove(logFile); err != nil {
+					log.Println(err)
+				}
+			}
+			return
+		}
+
 		idx := bytes.Index(logHtml, []byte("{{}}"))
 		if idx == -1 {
 			panic(errors.New("unable to locate the table body in log.html"))
@@ -130,26 +139,29 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 			} else {
 				w.Write([]byte(err.Error()))
 			}
-		} else if data, err := io.ReadAll(f); err != nil {
-			w.Write([]byte(err.Error()))
 		} else {
-			w.Write(logHtml[:idx])
-			rows := bytes.Split(data, []byte("\n"))
-			for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
-				rows[i], rows[j] = rows[j], rows[i]
-			}
-			for _, row := range rows {
-				if len(row) > 0 {
-					w.Write([]byte(`<tr>`))
-					for _, m := range regexp.MustCompile(`(\d{4}/\d{2}/\d{2}) (\d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)`).FindSubmatch(row)[1:] {
-						w.Write([]byte(`<td class="pe-4">`))
-						w.Write(m)
-						w.Write([]byte(`</td>`))
-					}
-					w.Write([]byte(`</tr>`))
+			defer f.Close()
+			if data, err := io.ReadAll(f); err != nil {
+				w.Write([]byte(err.Error()))
+			} else {
+				w.Write(logHtml[:idx])
+				rows := bytes.Split(data, []byte("\n"))
+				for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+					rows[i], rows[j] = rows[j], rows[i]
 				}
+				for _, row := range rows {
+					if len(row) > 0 {
+						w.Write([]byte(`<tr>`))
+						for _, m := range regexp.MustCompile(`(\d{4}/\d{2}/\d{2}) (\d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)`).FindSubmatch(row)[1:] {
+							w.Write([]byte(`<td class="pe-4">`))
+							w.Write(m)
+							w.Write([]byte(`</td>`))
+						}
+						w.Write([]byte(`</tr>`))
+					}
+				}
+				w.Write(logHtml[idx+4:])
 			}
-			w.Write(logHtml[idx+4:])
 		}
 	})
 

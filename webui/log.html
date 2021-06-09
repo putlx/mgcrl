@@ -35,9 +35,18 @@
 						<a class="nav-link" href="https://github.com/putlx/mgcrl">GitHub</a>
 					</li>
 				</ul>
+				<button type="button" class="d-flex btn btn-outline-danger">清空日志</button>
 			</div>
 		</div>
 	</nav>
+
+	<script>
+		window.addEventListener("load", function () {
+			document.querySelector("nav button.btn").addEventListener("click", function () {
+				fetch(location.href, { method: "POST" }).finally(() => location.reload());
+			});
+		});
+	</script>
 
 	<div class="table-responsive my-3 px-3">
 		<table class="table table-sm align-middle">
