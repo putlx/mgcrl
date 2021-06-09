@@ -102,11 +102,7 @@
 			tr.querySelector("button").onclick = function () {
 				fetch("/config", {
 					method: "POST",
-					body: JSON.stringify({
-						output: config.output,
-						frequency_in_hour: config.frequency_in_hour,
-						remove: config.assets.indexOf(asset) + 1
-					}),
+					body: JSON.stringify({ remove: config.assets.indexOf(asset) + 1 }),
 					headers: new Headers({ "Content-Type": "application/json" })
 				})
 					.then(response => response.json())
@@ -157,8 +153,6 @@
 				fetch("/config", {
 					method: "POST",
 					body: JSON.stringify({
-						output: config.output,
-						frequency_in_hour: config.frequency_in_hour,
 						name: asset.name,
 						url: asset.url,
 						version: asset.version,

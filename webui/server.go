@@ -270,12 +270,13 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 			} else if c, err := com.NewConfig(configFile); err != nil {
 				writeJSON(w, err.Error())
 			} else {
-				c.Output = u.Output
-				c.Frequency = u.Frequency
 				if u.Remove > 0 {
 					c.Assets = append(c.Assets[:u.Remove-1], c.Assets[u.Remove:]...)
 				} else if len(u.URL) > 0 {
 					c.Assets = append([]com.Asset{u.Asset}, c.Assets...)
+				} else {
+					c.Output = u.Output
+					c.Frequency = u.Frequency
 				}
 				if err = c.WriteTo(configFile); err != nil {
 					writeJSON(w, err.Error())
