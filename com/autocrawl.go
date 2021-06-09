@@ -3,7 +3,6 @@ package com
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"time"
@@ -49,17 +48,15 @@ func (c *Config) WriteTo(filename string) error {
 	return nil
 }
 
-func AutoCrawl(filename string, w io.Writer) {
+func AutoCrawl(configFile string, log *log.Logger) {
 	const maxTry = 4
 	const duration = time.Duration(10) * time.Minute
 
-	lg := log.New(w, "[autocrawl] ", log.LstdFlags|log.Lmsgprefix)
-
 	for {
-		config, err := NewConfig(filename)
+		config, err := NewConfig(configFile)
 		if err != nil {
 			beeep.Notify("错误", err.Error(), "")
-			lg.Fatalln(err)
+			log.Fatalln(err)
 		}
 
 		for i := range config.Assets {
@@ -69,23 +66,23 @@ func AutoCrawl(filename string, w io.Writer) {
 			for t := 0; ; t++ {
 				if t != 0 {
 					time.Sleep(duration)
-					lg.Println("retry getting " + a.URL)
+					log.Println("retry getting " + a.URL)
 				}
 				c, err = NewCrawler(a.URL, a.Version, config.Output, maxTry)
 				if err == nil {
 					break
 				}
-				lg.Println(err)
+				log.Println(err)
 			}
 
 			if c == nil {
-				lg.Println("fail to get " + a.URL)
+				log.Println("fail to get " + a.URL)
 				continue
 			} else if len(a.LastChapter) == 0 {
 				if len(c.Chapters) > 0 {
 					a.LastChapter = c.Chapters[len(c.Chapters)-1].Title
-					if err := config.WriteTo(filename); err != nil {
-						lg.Println(err)
+					if err := config.WriteTo(configFile); err != nil {
+						log.Println(err)
 						beeep.Notify("错误", err.Error(), "")
 					}
 				}
@@ -103,7 +100,7 @@ func AutoCrawl(filename string, w io.Writer) {
 				for t := 0; t < maxTry; t++ {
 					if t != 0 {
 						time.Sleep(duration)
-						lg.Printf("retry crawling 「%s / %s」\n", c.Title, c.Chapters[idx].Title)
+						log.Printf("retry crawling 「%s / %s」\n", c.Title, c.Chapters[idx].Title)
 					}
 					prg, errs, done := c.FetchChapter(idx)
 					var err *Error
@@ -112,18 +109,18 @@ func AutoCrawl(filename string, w io.Writer) {
 						select {
 						case <-prg:
 						case err = <-errs:
-							lg.Println(err)
+							log.Println(err)
 						case <-done:
 							break loop
 						}
 					}
 					if err == nil {
 						title := fmt.Sprintf("「%s / %s」", c.Title, c.Chapters[idx].Title)
-						lg.Println(title + " is downloaded")
+						log.Println(title + " is downloaded")
 						beeep.Notify("下载完成", title+"下载完毕。", "")
 						a.LastChapter = c.Chapters[idx].Title
-						if err := config.WriteTo(filename); err != nil {
-							lg.Println(err)
+						if err := config.WriteTo(configFile); err != nil {
+							log.Println(err)
 							beeep.Notify("错误", err.Error(), "")
 						}
 						break

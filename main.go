@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -45,14 +46,14 @@ func main() {
 		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions for serve:")
 		svFlags.PrintDefaults()
 	}
-	var version, selector, output, config, log string
+	var version, selector, output, config, logFile string
 	var maxRetry int
 	dlFlags.StringVar(&version, "v", "", "manga version")
 	dlFlags.StringVar(&selector, "c", "1:-1", "volumes or chapters")
 	dlFlags.StringVar(&output, "o", ".", "output directory")
 	dlFlags.IntVar(&maxRetry, "m", 3, "max retry time")
 	svFlags.StringVar(&config, "f", "", "auto crawl manga according to the config file")
-	svFlags.StringVar(&log, "l", "", "redirect log to file")
+	svFlags.StringVar(&logFile, "l", "", "redirect log to file")
 
 	enabled := true
 	defer colorable.EnableColorsStdout(&enabled)()
@@ -69,13 +70,13 @@ func main() {
 			fmt.Println(RED + err.Error() + RESET)
 		} else {
 			var w io.Writer = os.Stderr
-			if len(log) != 0 {
-				w = util.NewWriter(log)
+			if len(logFile) != 0 {
+				w = util.NewWriter(logFile)
 			}
 			if len(config) != 0 {
-				go com.AutoCrawl(config, w)
+				go com.AutoCrawl(config, log.New(w, "[autocrawl] ", log.LstdFlags|log.Lmsgprefix))
 			}
-			webui.Serve(port, config, log, w)
+			webui.Serve(port, config, logFile, log.New(w, "[webui] ", log.LstdFlags|log.Lmsgprefix))
 		}
 		return
 	} else if os.Args[1] != "get" {

@@ -52,39 +52,35 @@ type Task struct {
 	com.Progress
 }
 
-var tasks = &sync.Map{}
-var upgrader = websocket.Upgrader{}
-var lg *log.Logger
-
-func WriteJSON(w http.ResponseWriter, v interface{}) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if data, err := json.Marshal(v); err != nil {
-		lg.Fatalln(err)
-	} else if _, err = io.WriteString(w, string(data)); err != nil {
-		lg.Println(err)
-	}
-}
-
-func ReadJSON(req *http.Request, v interface{}) error {
-	if data, err := io.ReadAll(req.Body); err != nil {
-		return err
-	} else if err = json.Unmarshal(data, v); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Serve(port int, config, logFile string, w io.Writer) {
+func Serve(port int, configFile, logFile string, log *log.Logger) {
 	var id = make(chan int)
 	var tc = make(chan Task)
 	var crawler atomic.Value
+	var tasks = &sync.Map{}
+	var upgrader = websocket.Upgrader{}
 	go func() {
 		for i := 0; ; i++ {
 			id <- i
 		}
 	}()
 
-	lg = log.New(w, "[webui] ", log.LstdFlags|log.Lmsgprefix)
+	writeJSON := func(w http.ResponseWriter, v interface{}) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if data, err := json.Marshal(v); err != nil {
+			log.Fatalln(err)
+		} else if _, err = w.Write(data); err != nil {
+			log.Println(err)
+		}
+	}
+
+	readJSON := func(req *http.Request, v interface{}) error {
+		if data, err := io.ReadAll(req.Body); err != nil {
+			return err
+		} else if err = json.Unmarshal(data, v); err != nil {
+			return err
+		}
+		return nil
+	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -104,6 +100,11 @@ func Serve(port int, config, logFile string, w io.Writer) {
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		w.Write(css)
+	})
+
+	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "image/x-icon")
+		w.Write(favicon)
 	})
 
 	http.HandleFunc("/reader", func(w http.ResponseWriter, req *http.Request) {
@@ -152,30 +153,25 @@ func Serve(port int, config, logFile string, w io.Writer) {
 		}
 	})
 
-	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "image/x-icon")
-		w.Write(favicon)
-	})
-
 	http.HandleFunc("/get", func(w http.ResponseWriter, req *http.Request) {
 		var URL string
-		if err := ReadJSON(req, &URL); err != nil {
-			WriteJSON(w, err.Error())
+		if err := readJSON(req, &URL); err != nil {
+			writeJSON(w, err.Error())
 		} else if c, err := com.NewCrawler(URL, "", ".", 3); err != nil {
-			WriteJSON(w, err.Error())
+			writeJSON(w, err.Error())
 		} else {
-			WriteJSON(w, c.Chapters)
+			writeJSON(w, c.Chapters)
 			crawler.Store(c)
 		}
 	})
 
 	http.HandleFunc("/delete", func(w http.ResponseWriter, req *http.Request) {
 		var ID int
-		if err := ReadJSON(req, &ID); err != nil {
-			WriteJSON(w, err.Error())
+		if err := readJSON(req, &ID); err != nil {
+			writeJSON(w, err.Error())
 		} else {
 			tasks.Delete(ID)
-			WriteJSON(w, nil)
+			writeJSON(w, nil)
 		}
 	})
 
@@ -184,54 +180,55 @@ func Serve(port int, config, logFile string, w io.Writer) {
 			Indexes []int
 			Output  string
 		}
-		if err := ReadJSON(req, &r); err != nil {
-			WriteJSON(w, err.Error())
-		} else {
-			c := *crawler.Load().(*com.Crawler)
-			if len(r.Output) != 0 {
-				c.Output = r.Output
-			}
-			for _, idx := range r.Indexes {
-				go func(idx int, c *com.Crawler) {
-					t := Task{
-						ID:      <-id,
-						Manga:   c.Title,
-						Chapter: c.Chapters[idx].Title,
-						mutex:   &sync.Mutex{},
-					}
-					tc <- t
-					tasks.Store(t.ID, &t)
-					prg, errs, done := c.FetchChapter(idx)
-					for {
-						select {
-						case s := <-prg:
-							t.mutex.Lock()
-							t.Progress = s
-							tc <- t
-							t.mutex.Unlock()
-						case err := <-errs:
-							t.mutex.Lock()
-							t.Errors = append(t.Errors, err)
-							tc <- t
-							t.mutex.Unlock()
-						case <-done:
-							t.mutex.Lock()
-							t.Done = true
-							tc <- t
-							t.mutex.Unlock()
-							return
-						}
-					}
-				}(idx, &c)
-			}
-			WriteJSON(w, nil)
+		if err := readJSON(req, &r); err != nil {
+			writeJSON(w, err.Error())
+			return
 		}
+
+		c := *crawler.Load().(*com.Crawler)
+		if len(r.Output) != 0 {
+			c.Output = r.Output
+		}
+		for _, idx := range r.Indexes {
+			go func(idx int, c *com.Crawler) {
+				t := Task{
+					ID:      <-id,
+					Manga:   c.Title,
+					Chapter: c.Chapters[idx].Title,
+					mutex:   &sync.Mutex{},
+				}
+				tc <- t
+				tasks.Store(t.ID, &t)
+				prg, errs, done := c.FetchChapter(idx)
+				for {
+					select {
+					case s := <-prg:
+						t.mutex.Lock()
+						t.Progress = s
+						tc <- t
+						t.mutex.Unlock()
+					case err := <-errs:
+						t.mutex.Lock()
+						t.Errors = append(t.Errors, err)
+						tc <- t
+						t.mutex.Unlock()
+					case <-done:
+						t.mutex.Lock()
+						t.Done = true
+						tc <- t
+						t.mutex.Unlock()
+						return
+					}
+				}
+			}(idx, &c)
+		}
+		writeJSON(w, nil)
 	})
 
 	http.HandleFunc("/downloading", func(w http.ResponseWriter, req *http.Request) {
 		c, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
-			lg.Println(err)
+			log.Println(err)
 			return
 		}
 		defer c.Close()
@@ -241,25 +238,25 @@ func Serve(port int, config, logFile string, w io.Writer) {
 			t := *v
 			v.mutex.Unlock()
 			if err := c.WriteJSON(t); err != nil {
-				lg.Println(err)
+				log.Println(err)
 			}
 			return true
 		})
 		for {
 			if err := c.WriteJSON(<-tc); err != nil {
-				lg.Println(err)
+				log.Println(err)
 			}
 		}
 	})
 
 	http.HandleFunc("/config", func(w http.ResponseWriter, req *http.Request) {
-		if len(config) == 0 {
-			WriteJSON(w, nil)
+		if len(configFile) == 0 {
+			writeJSON(w, nil)
 		} else if req.Method == "GET" {
-			if c, err := com.NewConfig(config); err != nil {
-				WriteJSON(w, err.Error())
+			if c, err := com.NewConfig(configFile); err != nil {
+				writeJSON(w, err.Error())
 			} else {
-				WriteJSON(w, c)
+				writeJSON(w, c)
 			}
 		} else {
 			var u struct {
@@ -268,10 +265,10 @@ func Serve(port int, config, logFile string, w io.Writer) {
 				Output    string `json:"output"`
 				com.Asset
 			}
-			if err := ReadJSON(req, &u); err != nil {
-				WriteJSON(w, err.Error())
-			} else if c, err := com.NewConfig(config); err != nil {
-				WriteJSON(w, err.Error())
+			if err := readJSON(req, &u); err != nil {
+				writeJSON(w, err.Error())
+			} else if c, err := com.NewConfig(configFile); err != nil {
+				writeJSON(w, err.Error())
 			} else {
 				c.Output = u.Output
 				c.Frequency = u.Frequency
@@ -280,14 +277,14 @@ func Serve(port int, config, logFile string, w io.Writer) {
 				} else if len(u.URL) > 0 {
 					c.Assets = append([]com.Asset{u.Asset}, c.Assets...)
 				}
-				if err = c.WriteTo(config); err != nil {
-					WriteJSON(w, err.Error())
+				if err = c.WriteTo(configFile); err != nil {
+					writeJSON(w, err.Error())
 				} else {
-					WriteJSON(w, nil)
+					writeJSON(w, nil)
 				}
 			}
 		}
 	})
 
-	lg.Fatalln(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
+	log.Fatalln(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }
