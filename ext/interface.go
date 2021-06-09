@@ -29,7 +29,6 @@ var Extractors = []Extractor{
 	{regexp.MustCompile(`^https?://www\.700mh\.com/manhua/\d+/?$`), Katui, KatuiImages},
 	{regexp.MustCompile(`^https?://lsj\.ac/comic/\w+$`), Lsj, LsjImages},
 	{regexp.MustCompile(`^https?://www\.laimanhua\.com/kanmanhua/\d+/?$`), Laimanhua, LaimanhuaImages},
-	{regexp.MustCompile(`^https?://mangadex\.org/title/\d+`), Mangadex, MangadexImages},
 	{regexp.MustCompile(`^https?://m\.manhua123\.net/comic/\d+\.html$`), Manhua123, Manhua123Images},
 	{regexp.MustCompile(`^https?://www\.manhuadb\.com/manhua/\d+/?$`), Manhuadb, ManhuadbImages},
 	{regexp.MustCompile(`^https?://(www\.manhuagui|tw\.manhuagui|www\.mhgui)\.com/comic/\d+/?$`), Manhuagui, ManhuaguiImages},

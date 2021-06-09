@@ -42,7 +42,6 @@ For automated crawling, take `config.json` as an example.
 | katui | http://www.700mh.com/manhua/1436 |
 | laimanhua | https://www.laimanhua.com/kanmanhua/33952/ |
 | lsj | https://lsj.ac/comic/xugoutuile |
-| mangadex | https://mangadex.org/title/50810/natsu-no-mamono `-v group` |
 | manhua123 | https://m.manhua123.net/comic/8199.html |
 | manhuadb | https://www.manhuadb.com/manhua/1011 |
 | manhuagui | https://www.mhgui.com/comic/991/ `-v`<br>https://www.manhuagui.com/comic/842 `-v`<br>https://tw.manhuagui.com/comic/842 `-v` |
