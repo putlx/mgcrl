@@ -4,7 +4,6 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -118,19 +117,18 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 	})
 
 	http.HandleFunc("/log", func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == "POST" && len(logFile) != 0 {
-			if _, err := os.Stat(logFile); err == nil {
-				if err = os.Remove(logFile); err != nil {
-					log.Println(err)
+		if req.Method == "POST" {
+			if len(logFile) != 0 {
+				if _, err := os.Stat(logFile); err == nil {
+					if err = os.Remove(logFile); err != nil {
+						log.Println(err)
+					}
 				}
 			}
 			return
 		}
 
 		idx := bytes.Index(logHtml, []byte("{{}}"))
-		if idx == -1 {
-			panic(errors.New("unable to locate the table body in log.html"))
-		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if f, err := os.Open(logFile); err != nil {
 			if os.IsNotExist(err) {
