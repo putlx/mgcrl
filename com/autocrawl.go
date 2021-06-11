@@ -40,16 +40,15 @@ func NewConfig(filename string) (*Config, error) {
 }
 
 func (c *Config) WriteTo(filename string) error {
-	if data, err := json.MarshalIndent(c, "", "    "); err != nil {
-		return err
-	} else if err = os.WriteFile(filename, data, 0666); err != nil {
+	data, err := json.MarshalIndent(c, "", "    ")
+	if err != nil {
 		return err
 	}
-	return nil
+	return os.WriteFile(filename, data, 0666)
 }
 
 func AutoCrawl(configFile string, log *log.Logger) {
-	const maxTry = 4
+	const maxRetry = 3
 	const duration = time.Duration(10) * time.Minute
 
 	for {
@@ -61,22 +60,9 @@ func AutoCrawl(configFile string, log *log.Logger) {
 
 		for i := range config.Assets {
 			a := &config.Assets[i]
-			var c *Crawler
-			var err error
-			for t := 0; ; t++ {
-				if t != 0 {
-					time.Sleep(duration)
-					log.Println("retry getting " + a.URL)
-				}
-				c, err = NewCrawler(a.URL, a.Version, config.Output, maxTry)
-				if err == nil {
-					break
-				}
+			c, err := NewCrawler(a.URL, a.Version, config.Output, maxRetry)
+			if err != nil {
 				log.Println(err)
-			}
-
-			if c == nil {
-				log.Println("fail to get " + a.URL)
 				continue
 			} else if len(a.LastChapter) == 0 {
 				if len(c.Chapters) > 0 {
@@ -97,10 +83,11 @@ func AutoCrawl(configFile string, log *log.Logger) {
 				}
 			}
 			for idx := last + 1; idx < len(c.Chapters); idx++ {
-				for t := 0; t < maxTry; t++ {
-					if t != 0 {
+				title := fmt.Sprintf("「%s / %s」", c.Title, c.Chapters[idx].Title)
+				for t := -1; t < maxRetry; t++ {
+					if t >= 0 {
 						time.Sleep(duration)
-						log.Printf("retry crawling 「%s / %s」\n", c.Title, c.Chapters[idx].Title)
+						log.Println("retry crawling " + title)
 					}
 					prg, errs, done := c.FetchChapter(idx)
 					var err *Error
@@ -115,7 +102,6 @@ func AutoCrawl(configFile string, log *log.Logger) {
 						}
 					}
 					if err == nil {
-						title := fmt.Sprintf("「%s / %s」", c.Title, c.Chapters[idx].Title)
 						log.Println(title + " is downloaded")
 						beeep.Notify("下载完成", title+"下载完毕。", "")
 						a.LastChapter = c.Chapters[idx].Title

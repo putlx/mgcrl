@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"math/rand"
 	"net/url"
 	"os"
@@ -37,14 +36,18 @@ type Error struct {
 func NewCrawler(URL, ver, output string, maxRetry int) (*Crawler, error) {
 	for _, e := range ext.Extractors {
 		if e.URLRegexp.MatchString(URL) {
-			m, err := e.GetManga(URL, ver)
-			if err != nil {
-				return nil, err
-			}
 			if maxRetry < 0 {
-				maxRetry = math.MaxInt8
+				maxRetry = int(^uint(0) >> 1)
 			}
-			return &Crawler{e, m, URL, output, maxRetry}, nil
+			var lastErr error
+			for t := -1; t < maxRetry; t++ {
+				m, err := e.GetManga(URL, ver)
+				if err == nil {
+					return &Crawler{e, m, URL, output, maxRetry}, nil
+				}
+				lastErr = err
+			}
+			return nil, lastErr
 		}
 	}
 	return nil, errors.New("unsupported URL")
@@ -92,12 +95,13 @@ func (c *Crawler) FetchChapter(idx int) (<-chan Progress, <-chan *Error, <-chan 
 			}
 			name := fmt.Sprintf("%03d", i+1) + extFinder.FindStringSubmatch(URL.Path)[1]
 
-			if c.Delay > 0 {
-				time.Sleep(time.Duration(i) * c.Delay)
-			}
 			for t := -1; t < c.MaxRetry; t++ {
-				if c.Delay > 0 && t != -1 {
-					time.Sleep(c.Delay + time.Duration(rand.Int()%100)*time.Millisecond)
+				if c.Delay > 0 {
+					if t == -1 {
+						time.Sleep(time.Duration(i) * c.Delay)
+					} else {
+						time.Sleep(c.Delay + time.Duration(rand.Int()%100)*time.Millisecond)
+					}
 				}
 				if err = func() error {
 					resp, err := util.GetResponse(imgs[i], &c.Chapters[idx].URL)
