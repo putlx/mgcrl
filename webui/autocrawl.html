@@ -180,10 +180,7 @@
 				const output = document.querySelector("#output input").value.trim();
 				fetch("/config", {
 					method: "POST",
-					body: JSON.stringify({
-						output: output,
-						frequency_in_hour: config.frequency_in_hour
-					}),
+					body: JSON.stringify({ output: output }),
 					headers: new Headers({ "Content-Type": "application/json" })
 				})
 					.then(response => response.json())
@@ -205,31 +202,25 @@
 			document.querySelector("#frequency button").onclick = function () {
 				if (!config) return toast("未指定配置文件。");
 				let frequency = document.querySelector("#frequency input").value.trim();
-				if (frequency) {
-					frequency = parseInt(frequency);
-					if (isNaN(frequency)) return toast("更新间隔应为整数。");
-				} else {
-					frequency = 0;
+				if (!frequency || isNaN(frequency = parseInt(frequency)) || frequency <= 0) {
+					return toast("更新间隔应为正整数。");
 				}
 				fetch("/config", {
 					method: "POST",
-					body: JSON.stringify({
-						output: config.output,
-						frequency_in_hour: frequency
-					}),
+					body: JSON.stringify({ frequency_in_hour: frequency }),
 					headers: new Headers({ "Content-Type": "application/json" })
 				})
 					.then(response => response.json())
 					.then(response => {
 						if (response === null) {
-							config.frequency = frequency;
+							config.frequency_in_hour = frequency;
 						} else {
-							document.querySelector("#frequency input").value = config.frequency;
+							document.querySelector("#frequency input").value = config.frequency_in_hour;
 							toast(`错误：${response}。`);
 						}
 					})
 					.catch(error => {
-						document.querySelector("#frequency input").value = config.frequency;
+						document.querySelector("#frequency input").value = config.frequency_in_hour;
 						toast(`错误：${error.message}。`);
 						console.log(error);
 					});

@@ -286,8 +286,9 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 					c.Assets = append(c.Assets[:u.Remove-1], c.Assets[u.Remove:]...)
 				} else if len(u.URL) > 0 {
 					c.Assets = append([]com.Asset{u.Asset}, c.Assets...)
-				} else {
+				} else if len(u.Output) > 0 {
 					c.Output = u.Output
+				} else if u.Frequency > 0 {
 					c.Frequency = u.Frequency
 				}
 				if err = c.Save(); err != nil {
