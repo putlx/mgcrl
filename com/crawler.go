@@ -37,14 +37,18 @@ type Error struct {
 func NewCrawler(URL, ver, output string, maxRetry int) (*Crawler, error) {
 	for _, e := range ext.Extractors {
 		if e.URLRegexp.MatchString(URL) {
-			m, err := e.GetManga(URL, ver)
-			if err != nil {
-				return nil, err
-			}
 			if maxRetry < 0 {
 				maxRetry = math.MaxInt8
 			}
-			return &Crawler{e, m, URL, output, maxRetry}, nil
+			var lastErr error
+			for t := -1; t < maxRetry; t++ {
+				m, err := e.GetManga(URL, ver)
+				if err == nil {
+					return &Crawler{e, m, URL, output, maxRetry}, nil
+				}
+				lastErr = err
+			}
+			return nil, lastErr
 		}
 	}
 	return nil, errors.New("unsupported URL")

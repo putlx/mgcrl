@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -12,7 +10,6 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/putlx/mgcrl/com"
 	"github.com/putlx/mgcrl/ext"
-	"github.com/putlx/mgcrl/util"
 	"github.com/putlx/mgcrl/webui"
 )
 
@@ -34,26 +31,20 @@ func main() {
 		dlFlags.PrintDefaults()
 	}
 	svFlags.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), "Usage: mgcrl serve <PORT> [options]")
-		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
-		svFlags.PrintDefaults()
+		fmt.Fprintln(flag.CommandLine.Output(), "Usage: mgcrl serve <PORT> <DATABASE_NAME>")
 	}
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Usage: mgcrl get <URL> [options]")
-		fmt.Fprintln(flag.CommandLine.Output(), "       mgcrl serve <PORT> [options]")
+		fmt.Fprintln(flag.CommandLine.Output(), "       mgcrl serve <PORT> <DATABASE_NAME>")
 		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions for get:")
 		dlFlags.PrintDefaults()
-		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions for serve:")
-		svFlags.PrintDefaults()
 	}
-	var version, selector, output, config, logFile string
+	var version, selector, output string
 	var maxRetry int
 	dlFlags.StringVar(&version, "v", "", "manga version")
 	dlFlags.StringVar(&selector, "c", "1:-1", "volumes or chapters")
 	dlFlags.StringVar(&output, "o", ".", "output directory")
 	dlFlags.IntVar(&maxRetry, "m", 3, "max retry time")
-	svFlags.StringVar(&config, "f", "", "auto crawl manga according to the config file")
-	svFlags.StringVar(&logFile, "l", "", "redirect log to file")
 
 	enabled := true
 	defer colorable.EnableColorsStdout(&enabled)()
@@ -62,27 +53,26 @@ func main() {
 		flag.Usage()
 		return
 	} else if os.Args[1] == "serve" {
-		if len(os.Args) < 3 {
+		if len(os.Args) < 4 {
 			svFlags.Usage()
 		} else if port, err := strconv.Atoi(os.Args[2]); err != nil {
 			fmt.Println(RED + "invalid port" + RESET)
-		} else if err := svFlags.Parse(os.Args[3:]); err != nil {
+		} else if db, err := com.OpenDB(os.Args[3]); err != nil {
 			fmt.Println(RED + err.Error() + RESET)
 		} else {
-			var w io.Writer = os.Stderr
-			if len(logFile) != 0 {
-				w = util.NewWriter(logFile)
-			}
-			if len(config) != 0 {
-				go com.AutoCrawl(config, log.New(w, "[autocrawl] ", log.LstdFlags|log.Lmsgprefix))
-			}
-			webui.Serve(port, config, logFile, log.New(w, "[webui] ", log.LstdFlags|log.Lmsgprefix))
+			go func() {
+				if err := com.AutoCrawl(db); err != nil {
+					fmt.Println(RED + err.Error() + RESET)
+					os.Exit(1)
+				}
+			}()
+			webui.Serve(port, db)
 		}
 		return
 	} else if os.Args[1] != "get" {
 		fmt.Println(RED + os.Args[1] + ": unknown command" + RESET)
 		return
-	} else if len(os.Args) < 3 || strings.HasPrefix(os.Args[2], "-") {
+	} else if len(os.Args) < 3 {
 		dlFlags.Usage()
 		return
 	} else if err := dlFlags.Parse(os.Args[3:]); err != nil {

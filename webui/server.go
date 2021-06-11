@@ -2,17 +2,16 @@ package webui
 
 import (
 	"bytes"
+	"database/sql"
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"os"
-	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/putlx/mgcrl/com"
@@ -52,7 +51,7 @@ type Task struct {
 	com.Progress
 }
 
-func Serve(port int, configFile, logFile string, log *log.Logger) {
+func Serve(port int, db *sql.DB) {
 	var id = make(chan int)
 	var tc = make(chan Task)
 	var crawler atomic.Value
@@ -64,22 +63,25 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 		}
 	}()
 
+	log := func(m string) {
+		db.Exec("INSERT INTO sv_log VALUES (?, ?)", time.Now().Unix(), m)
+	}
+
 	writeJSON := func(w http.ResponseWriter, v interface{}) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if data, err := json.Marshal(v); err != nil {
-			log.Fatalln(err)
+			panic(err)
 		} else if _, err = w.Write(data); err != nil {
-			log.Println(err)
+			log(err.Error())
 		}
 	}
 
 	readJSON := func(req *http.Request, v interface{}) error {
-		if data, err := io.ReadAll(req.Body); err != nil {
-			return err
-		} else if err = json.Unmarshal(data, v); err != nil {
+		data, err := io.ReadAll(req.Body)
+		if err != nil {
 			return err
 		}
-		return nil
+		return json.Unmarshal(data, v)
 	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
@@ -118,51 +120,40 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 	})
 
 	http.HandleFunc("/log", func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == "POST" && len(logFile) != 0 {
-			if _, err := os.Stat(logFile); err == nil {
-				if err = os.Remove(logFile); err != nil {
-					log.Println(err)
-				}
+		if req.Method == "POST" {
+			if _, err := db.Exec("DELETE FROM sv_log"); err != nil {
+				log(err.Error())
 			}
 			return
 		}
 
 		idx := bytes.Index(logHtml, []byte("{{}}"))
-		if idx == -1 {
-			panic(errors.New("unable to locate the table body in log.html"))
+		rows, err := db.Query("SELECT time, 'server', message FROM sv_log" +
+			" UNION SELECT time, 'autocrawl', message FROM ac_log ORDER BY time DESC")
+		if err != nil {
+			panic(err)
 		}
+		defer rows.Close()
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if f, err := os.Open(logFile); err != nil {
-			if os.IsNotExist(err) {
-				w.Write(logHtml[:idx])
-				w.Write(logHtml[idx+4:])
-			} else {
-				w.Write([]byte(err.Error()))
+		w.Write(logHtml[:idx])
+		for rows.Next() {
+			var timestamp int64
+			var from, message string
+			if err = rows.Scan(&timestamp, &from, &message); err != nil {
+				panic(err)
 			}
-		} else {
-			defer f.Close()
-			if data, err := io.ReadAll(f); err != nil {
-				w.Write([]byte(err.Error()))
-			} else {
-				w.Write(logHtml[:idx])
-				rows := bytes.Split(data, []byte("\n"))
-				for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
-					rows[i], rows[j] = rows[j], rows[i]
-				}
-				for _, row := range rows {
-					if len(row) > 0 {
-						w.Write([]byte(`<tr>`))
-						for _, m := range regexp.MustCompile(`(\d{4}/\d{2}/\d{2}) (\d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)`).FindSubmatch(row)[1:] {
-							w.Write([]byte(`<td class="pe-4">`))
-							w.Write(m)
-							w.Write([]byte(`</td>`))
-						}
-						w.Write([]byte(`</tr>`))
-					}
-				}
-				w.Write(logHtml[idx+4:])
-			}
+			dt := strings.Split(strings.Split(time.Unix(timestamp, 0).String(), ".")[0], " ")
+			w.Write([]byte(`<tr><td class="pe-4">`))
+			w.Write([]byte(dt[0]))
+			w.Write([]byte(`</td><td class="pe-4">`))
+			w.Write([]byte(dt[1]))
+			w.Write([]byte(`</td><td class="pe-4">`))
+			w.Write([]byte(from))
+			w.Write([]byte(`</td><td class="pe-4">`))
+			w.Write([]byte(message))
+			w.Write([]byte(`</td></tr>`))
 		}
+		w.Write(logHtml[idx+4:])
 	})
 
 	http.HandleFunc("/get", func(w http.ResponseWriter, req *http.Request) {
@@ -172,8 +163,8 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 		} else if c, err := com.NewCrawler(URL, "", ".", 3); err != nil {
 			writeJSON(w, err.Error())
 		} else {
-			writeJSON(w, c.Chapters)
 			crawler.Store(c)
+			writeJSON(w, c.Chapters)
 		}
 	})
 
@@ -240,64 +231,105 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 	http.HandleFunc("/downloading", func(w http.ResponseWriter, req *http.Request) {
 		c, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
-			log.Println(err)
+			log(err.Error())
 			return
 		}
 		defer c.Close()
 		tasks.Range(func(key, value interface{}) bool {
 			v := value.(*Task)
 			v.mutex.Lock()
-			t := *v
+			err := c.WriteJSON(v)
 			v.mutex.Unlock()
-			if err := c.WriteJSON(t); err != nil {
-				log.Println(err)
+			if err != nil {
+				log(err.Error())
 			}
 			return true
 		})
 		for {
 			if err := c.WriteJSON(<-tc); err != nil {
-				log.Println(err)
+				log(err.Error())
 			}
 		}
 	})
 
 	http.HandleFunc("/config", func(w http.ResponseWriter, req *http.Request) {
-		if len(configFile) == 0 {
-			writeJSON(w, nil)
-		} else if req.Method == "GET" {
-			if c, err := com.NewConfig(configFile); err != nil {
-				writeJSON(w, err.Error())
-			} else {
-				writeJSON(w, c)
+		if req.Method == "GET" {
+			type Asset struct {
+				Name        string `json:"name"`
+				URL         string `json:"url"`
+				Version     string `json:"version"`
+				LastChapter string `json:"last_chapter"`
 			}
-		} else {
-			var u struct {
-				Remove    int    `json:"remove"`
-				Frequency int    `json:"frequency_in_hour"`
-				Output    string `json:"output"`
-				com.Asset
+			var config struct {
+				Output string  `json:"output"`
+				Freq   int     `json:"freq"`
+				Assets []Asset `json:"assets"`
 			}
-			if err := readJSON(req, &u); err != nil {
-				writeJSON(w, err.Error())
-			} else if c, err := com.NewConfig(configFile); err != nil {
-				writeJSON(w, err.Error())
-			} else {
-				if u.Remove > 0 {
-					c.Assets = append(c.Assets[:u.Remove-1], c.Assets[u.Remove:]...)
-				} else if len(u.URL) > 0 {
-					c.Assets = append([]com.Asset{u.Asset}, c.Assets...)
-				} else {
-					c.Output = u.Output
-					c.Frequency = u.Frequency
+			var attr string
+			rows, err := db.Query("SELECT * FROM config WHERE attr = 'output'")
+			if err != nil {
+				panic(err)
+			}
+			rows.Next()
+			if err = rows.Scan(&attr, &config.Output); err != nil {
+				panic(err)
+			}
+			rows.Close()
+			rows, err = db.Query("SELECT * FROM config WHERE attr = 'freq_in_hour'")
+			if err != nil {
+				panic(err)
+			}
+			rows.Next()
+			if err = rows.Scan(&attr, &config.Freq); err != nil {
+				panic(err)
+			}
+			rows.Close()
+			rows, err = db.Query("SELECT * FROM assets")
+			if err != nil {
+				panic(err)
+			}
+			for rows.Next() {
+				var a Asset
+				if err = rows.Scan(&a.Name, &a.URL, &a.Version, &a.LastChapter); err != nil {
+					panic(err)
 				}
-				if err = c.WriteTo(configFile); err != nil {
-					writeJSON(w, err.Error())
-				} else {
+				config.Assets = append(config.Assets, a)
+			}
+			rows.Close()
+			writeJSON(w, config)
+		} else {
+			var r struct {
+				Remove      string `json:"remove"`
+				Freq        int    `json:"freq"`
+				Output      string `json:"output"`
+				Name        string `json:"name"`
+				URL         string `json:"url"`
+				Version     string `json:"version"`
+				LastChapter string `json:"last_chapter"`
+			}
+			if err := readJSON(req, &r); err != nil {
+				writeJSON(w, err.Error())
+			} else {
+				var err error
+				if len(r.Remove) > 0 {
+					_, err = db.Exec("DELETE FROM assets WHERE name = ?", r.Remove)
+				} else if len(r.Name) > 0 {
+					_, err = db.Exec("INSERT INTO assets VALUES (?, ?, ?, ?)", r.Name, r.URL, r.Version, r.LastChapter)
+				} else if len(r.Output) > 0 {
+					_, err = db.Exec("UPDATE config SET val = ? WHERE attr = 'output'", r.Output)
+				} else if r.Freq > 0 {
+					_, err = db.Exec("UPDATE config SET val = ? WHERE attr = 'freq_in_hour'", r.Freq)
+				}
+				if err == nil {
 					writeJSON(w, nil)
+				} else {
+					writeJSON(w, err.Error())
 				}
 			}
 		}
 	})
 
-	log.Fatalln(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+		log(err.Error())
+	}
 }

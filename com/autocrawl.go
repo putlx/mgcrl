@@ -1,89 +1,58 @@
 package com
 
 import (
-	"encoding/json"
+	"database/sql"
 	"fmt"
-	"log"
-	"os"
 	"time"
 
 	"github.com/gen2brain/beeep"
 )
 
-type Asset struct {
-	Name        string `json:"name"`
-	URL         string `json:"url"`
-	Version     string `json:"version"`
-	LastChapter string `json:"last_chapter"`
-}
-
-type Config struct {
-	Assets    []Asset `json:"assets"`
-	Frequency int     `json:"frequency_in_hour"`
-	Output    string  `json:"output"`
-}
-
-func NewConfig(filename string) (*Config, error) {
-	var c Config
-	if data, err := os.ReadFile(filename); err != nil {
-		return nil, err
-	} else if err = json.Unmarshal(data, &c); err != nil {
-		return nil, err
+func AutoCrawl(db *sql.DB) error {
+	log := func(m string) {
+		db.Exec("INSERT INTO ac_log VALUES (?, ?)", time.Now().Unix(), m)
 	}
-	if len(c.Output) == 0 {
-		c.Output = "."
-	}
-	if c.Frequency <= 0 {
-		c.Frequency = 6
-	}
-	return &c, nil
-}
 
-func (c *Config) WriteTo(filename string) error {
-	if data, err := json.MarshalIndent(c, "", "    "); err != nil {
-		return err
-	} else if err = os.WriteFile(filename, data, 0666); err != nil {
-		return err
+	getConfigItem := func(attr string, val interface{}) error {
+		rows, err := db.Query("SELECT val FROM config WHERE attr = ?", attr)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		rows.Next()
+		return rows.Scan(val)
 	}
-	return nil
-}
-
-func AutoCrawl(configFile string, log *log.Logger) {
-	const maxTry = 4
-	const duration = time.Duration(10) * time.Minute
 
 	for {
-		config, err := NewConfig(configFile)
-		if err != nil {
-			beeep.Notify("错误", err.Error(), "")
-			log.Fatalln(err)
+		var maxRetry, duration int
+		var output string
+		if err := getConfigItem("max_retry", &maxRetry); err != nil {
+			return err
+		} else if err = getConfigItem("duration", &duration); err != nil {
+			return err
+		} else if err = getConfigItem("output", &output); err != nil {
+			return err
 		}
 
-		for i := range config.Assets {
-			a := &config.Assets[i]
-			var c *Crawler
-			var err error
-			for t := 0; ; t++ {
-				if t != 0 {
-					time.Sleep(duration)
-					log.Println("retry getting " + a.URL)
-				}
-				c, err = NewCrawler(a.URL, a.Version, config.Output, maxTry)
-				if err == nil {
-					break
-				}
-				log.Println(err)
+		rows, err := db.Query("SELECT * FROM assets")
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var name, url, version, lastChapter string
+			if err = rows.Scan(&name, &url, &version, &lastChapter); err != nil {
+				return err
 			}
-
-			if c == nil {
-				log.Println("fail to get " + a.URL)
+			c, err := NewCrawler(url, version, output, maxRetry)
+			if err != nil {
+				log(err.Error())
 				continue
-			} else if len(a.LastChapter) == 0 {
+			} else if len(lastChapter) == 0 {
 				if len(c.Chapters) > 0 {
-					a.LastChapter = c.Chapters[len(c.Chapters)-1].Title
-					if err := config.WriteTo(configFile); err != nil {
-						log.Println(err)
-						beeep.Notify("错误", err.Error(), "")
+					lastChapter = c.Chapters[len(c.Chapters)-1].Title
+					_, err = db.Exec("UPDATE assets SET last_chapter = ? WHERE name = ?", lastChapter, name)
+					if err != nil {
+						log(err.Error())
 					}
 				}
 				continue
@@ -91,16 +60,17 @@ func AutoCrawl(configFile string, log *log.Logger) {
 
 			last := len(c.Chapters) - 1
 			for i := range c.Chapters {
-				if a.LastChapter == c.Chapters[i].Title {
+				if lastChapter == c.Chapters[i].Title {
 					last = i
 					break
 				}
 			}
 			for idx := last + 1; idx < len(c.Chapters); idx++ {
-				for t := 0; t < maxTry; t++ {
-					if t != 0 {
-						time.Sleep(duration)
-						log.Printf("retry crawling 「%s / %s」\n", c.Title, c.Chapters[idx].Title)
+				title := fmt.Sprintf("「%s / %s」", c.Title, c.Chapters[idx].Title)
+				for t := -1; t < maxRetry; t++ {
+					if t >= 0 {
+						time.Sleep(time.Duration(duration) * time.Second)
+						log("retry crawling " + title)
 					}
 					prg, errs, done := c.FetchChapter(idx)
 					var err *Error
@@ -109,25 +79,32 @@ func AutoCrawl(configFile string, log *log.Logger) {
 						select {
 						case <-prg:
 						case err = <-errs:
-							log.Println(err)
+							log("get " + err.Filename + ": " + err.Error)
 						case <-done:
 							break loop
 						}
 					}
 					if err == nil {
-						title := fmt.Sprintf("「%s / %s」", c.Title, c.Chapters[idx].Title)
-						log.Println(title + " is downloaded")
+						log(title + " is downloaded")
 						beeep.Notify("下载完成", title+"下载完毕。", "")
-						a.LastChapter = c.Chapters[idx].Title
-						if err := config.WriteTo(configFile); err != nil {
-							log.Println(err)
-							beeep.Notify("错误", err.Error(), "")
+						lastChapter = c.Chapters[idx].Title
+						_, err := db.Exec("UPDATE assets SET last_chapter = ? WHERE name = ?", lastChapter, name)
+						if err != nil {
+							log(err.Error())
 						}
 						break
 					}
 				}
 			}
 		}
-		time.Sleep(time.Duration(config.Frequency) * time.Hour)
+		if err = rows.Close(); err != nil {
+			log(err.Error())
+		}
+
+		var freq int
+		if err = getConfigItem("freq_in_hour", &freq); err != nil {
+			return err
+		}
+		time.Sleep(time.Duration(freq) * time.Hour)
 	}
 }

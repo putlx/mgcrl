@@ -50,7 +50,7 @@
 		<button class="btn btn-outline-secondary" type="button">保存</button>
 	</div>
 
-	<div class="input-group my-3 px-3" id="frequency">
+	<div class="input-group my-3 px-3" id="freq">
 		<span class="input-group-text">更新间隔</span>
 		<input type="text" class="form-control">
 		<span class="input-group-text">小时</span>
@@ -102,7 +102,7 @@
 			tr.querySelector("button").onclick = function () {
 				fetch("/config", {
 					method: "POST",
-					body: JSON.stringify({ remove: config.assets.indexOf(asset) + 1 }),
+					body: JSON.stringify({ remove: asset.name }),
 					headers: new Headers({ "Content-Type": "application/json" })
 				})
 					.then(response => response.json())
@@ -124,16 +124,11 @@
 			fetch("/config")
 				.then(response => response.json())
 				.then(response => {
-					if (response === null) {
-						toast("未指定配置文件。");
-					} else if (typeof response === "string") {
-						toast(`错误：${response}。`);
-					} else {
-						config = response;
-						document.querySelector("#output input").value = response.output;
-						document.querySelector("#frequency input").value = response.frequency_in_hour;
-						response.assets.forEach(displayAsset);
-					}
+					config = response;
+					document.querySelector("#output input").value = response.output;
+					document.querySelector("#freq input").value = response.freq;
+					response.assets = response.assets || [];
+					response.assets.forEach(displayAsset);
 				})
 				.catch(error => {
 					toast(`错误：${error.message}。`);
@@ -141,7 +136,6 @@
 				});
 
 			document.querySelector("tbody tr td button").onclick = function () {
-				if (!config) return toast("未指定配置文件。");
 				const group = document.querySelector("tbody tr");
 				const asset = {
 					name: group.querySelector("td:nth-child(1) input").value.trim(),
@@ -149,7 +143,9 @@
 					version: group.querySelector("td:nth-child(3) input").value.trim(),
 					last_chapter: group.querySelector("td:nth-child(4) input").value.trim()
 				};
-				if (!asset.url) return toast("链接不可为空");
+				if (!asset.name) return toast("漫画名称不可为空。");
+				if (!asset.url) return toast("链接不可为空。");
+				if (config.assets.some(a => a.name === asset.name)) return toast("漫画名称不可重复。");
 				fetch("/config", {
 					method: "POST",
 					body: JSON.stringify({
@@ -176,14 +172,10 @@
 			};
 
 			document.querySelector("#output button").onclick = function () {
-				if (!config) return toast("未指定配置文件。");
 				const output = document.querySelector("#output input").value.trim();
 				fetch("/config", {
 					method: "POST",
-					body: JSON.stringify({
-						output: output,
-						frequency_in_hour: config.frequency_in_hour
-					}),
+					body: JSON.stringify({ output: output }),
 					headers: new Headers({ "Content-Type": "application/json" })
 				})
 					.then(response => response.json())
@@ -202,34 +194,27 @@
 					});
 			};
 
-			document.querySelector("#frequency button").onclick = function () {
-				if (!config) return toast("未指定配置文件。");
-				let frequency = document.querySelector("#frequency input").value.trim();
-				if (frequency) {
-					frequency = parseInt(frequency);
-					if (isNaN(frequency)) return toast("更新间隔应为整数。");
-				} else {
-					frequency = 0;
+			document.querySelector("#freq button").onclick = function () {
+				let freq = document.querySelector("#freq input").value.trim();
+				if (!freq || isNaN(freq = parseInt(freq)) || freq <= 0) {
+					return toast("更新间隔应为正整数。");
 				}
 				fetch("/config", {
 					method: "POST",
-					body: JSON.stringify({
-						output: config.output,
-						frequency_in_hour: frequency
-					}),
+					body: JSON.stringify({ freq: freq }),
 					headers: new Headers({ "Content-Type": "application/json" })
 				})
 					.then(response => response.json())
 					.then(response => {
 						if (response === null) {
-							config.frequency = frequency;
+							config.freq = freq;
 						} else {
-							document.querySelector("#frequency input").value = config.frequency;
+							document.querySelector("#freq input").value = config.freq;
 							toast(`错误：${response}。`);
 						}
 					})
 					.catch(error => {
-						document.querySelector("#frequency input").value = config.frequency;
+						document.querySelector("#freq input").value = config.freq;
 						toast(`错误：${error.message}。`);
 						console.log(error);
 					});
