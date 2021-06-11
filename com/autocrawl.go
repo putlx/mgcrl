@@ -21,6 +21,7 @@ type Config struct {
 	Assets    []Asset `json:"assets"`
 	Frequency int     `json:"frequency_in_hour"`
 	Output    string  `json:"output"`
+	filename  string
 }
 
 func NewConfig(filename string) (*Config, error) {
@@ -36,15 +37,16 @@ func NewConfig(filename string) (*Config, error) {
 	if c.Frequency <= 0 {
 		c.Frequency = 6
 	}
+	c.filename = filename
 	return &c, nil
 }
 
-func (c *Config) WriteTo(filename string) error {
+func (c *Config) Save() error {
 	data, err := json.MarshalIndent(c, "", "    ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filename, data, 0666)
+	return os.WriteFile(c.filename, data, 0666)
 }
 
 func AutoCrawl(configFile string, log *log.Logger) {
@@ -67,7 +69,7 @@ func AutoCrawl(configFile string, log *log.Logger) {
 			} else if len(a.LastChapter) == 0 {
 				if len(c.Chapters) > 0 {
 					a.LastChapter = c.Chapters[len(c.Chapters)-1].Title
-					if err := config.WriteTo(configFile); err != nil {
+					if err := config.Save(); err != nil {
 						log.Println(err)
 						beeep.Notify("错误", err.Error(), "")
 					}
@@ -105,7 +107,7 @@ func AutoCrawl(configFile string, log *log.Logger) {
 						log.Println(title + " is downloaded")
 						beeep.Notify("下载完成", title+"下载完毕。", "")
 						a.LastChapter = c.Chapters[idx].Title
-						if err := config.WriteTo(configFile); err != nil {
+						if err := config.Save(); err != nil {
 							log.Println(err)
 							beeep.Notify("错误", err.Error(), "")
 						}

@@ -290,7 +290,7 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 					c.Output = u.Output
 					c.Frequency = u.Frequency
 				}
-				if err = c.WriteTo(configFile); err != nil {
+				if err = c.Save(); err != nil {
 					writeJSON(w, err.Error())
 				} else {
 					writeJSON(w, nil)
