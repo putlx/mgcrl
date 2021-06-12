@@ -32,5 +32,6 @@ var Extractors = []Extractor{
 	{regexp.MustCompile(`^https?://m\.manhua123\.net/comic/\d+\.html$`), Manhua123, Manhua123Images},
 	{regexp.MustCompile(`^https?://www\.manhuadb\.com/manhua/\d+/?$`), Manhuadb, ManhuadbImages},
 	{regexp.MustCompile(`^https?://(www\.manhuagui|tw\.manhuagui|www\.mhgui)\.com/comic/\d+/?$`), Manhuagui, ManhuaguiImages},
+	{regexp.MustCompile(`^https?://www\.mm1316\.com/\w+/\w+/?$`), Mm1316, Mm1316Images},
 	{regexp.MustCompile(`^https?://tieba\.baidu\.com/p/\d+`), Tieba, TiebaImages},
 }

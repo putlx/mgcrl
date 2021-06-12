@@ -45,6 +45,7 @@ For automated crawling, take `config.json` as an example.
 | manhua123 | https://m.manhua123.net/comic/8199.html |
 | manhuadb | https://www.manhuadb.com/manhua/1011 |
 | manhuagui | https://www.mhgui.com/comic/991/ `-v`<br>https://www.manhuagui.com/comic/842 `-v`<br>https://tw.manhuagui.com/comic/842 `-v` |
+| mm1316 | https://www.mm1316.com/rexue/BluePeriod/ |
 | tieba | https://tieba.baidu.com/p/6910932313 |
 
 ## License
