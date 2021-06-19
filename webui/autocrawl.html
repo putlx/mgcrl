@@ -132,7 +132,7 @@
 						config = response;
 						document.querySelector("#output input").value = response.output;
 						document.querySelector("#frequency input").value = response.frequency_in_hour;
-						response.assets.forEach(displayAsset);
+						response.assets.forEach(asset => displayAsset(asset));
 					}
 				})
 				.catch(error => {
