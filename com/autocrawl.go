@@ -11,10 +11,10 @@ import (
 )
 
 type Asset struct {
-	Name        string `json:"name"`
-	URL         string `json:"url"`
-	Version     string `json:"version"`
-	LastChapter string `json:"last_chapter"`
+	Name          string `json:"name"`
+	URL           string `json:"url"`
+	Version       string `json:"version"`
+	LatestChapter string `json:"latest_chapter"`
 }
 
 type Config struct {
@@ -66,9 +66,9 @@ func AutoCrawl(configFile string, log *log.Logger) {
 			if err != nil {
 				log.Println(err)
 				continue
-			} else if len(a.LastChapter) == 0 {
+			} else if len(a.LatestChapter) == 0 {
 				if len(c.Chapters) > 0 {
-					a.LastChapter = c.Chapters[len(c.Chapters)-1].Title
+					a.LatestChapter = c.Chapters[len(c.Chapters)-1].Title
 					if err := config.Save(); err != nil {
 						log.Println(err)
 						beeep.Notify("错误", err.Error(), "")
@@ -77,14 +77,14 @@ func AutoCrawl(configFile string, log *log.Logger) {
 				continue
 			}
 
-			last := len(c.Chapters) - 1
+			latest := len(c.Chapters) - 1
 			for i := range c.Chapters {
-				if a.LastChapter == c.Chapters[i].Title {
-					last = i
+				if a.LatestChapter == c.Chapters[i].Title {
+					latest = i
 					break
 				}
 			}
-			for idx := last + 1; idx < len(c.Chapters); idx++ {
+			for idx := latest + 1; idx < len(c.Chapters); idx++ {
 				title := fmt.Sprintf("「%s / %s」", c.Title, c.Chapters[idx].Title)
 				for t := -1; t < maxRetry; t++ {
 					if t >= 0 {
@@ -106,7 +106,7 @@ func AutoCrawl(configFile string, log *log.Logger) {
 					if err == nil {
 						log.Println(title + " is downloaded")
 						beeep.Notify("下载完成", title+"下载完毕。", "")
-						a.LastChapter = c.Chapters[idx].Title
+						a.LatestChapter = c.Chapters[idx].Title
 						if err := config.Save(); err != nil {
 							log.Println(err)
 							beeep.Notify("错误", err.Error(), "")

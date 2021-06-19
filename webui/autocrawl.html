@@ -64,7 +64,7 @@
 					<th scope="col" class="pe-4">漫画</th>
 					<th scope="col" class="pe-4">链接</th>
 					<th scope="col" class="pe-4">版本</th>
-					<th scope="col" class="pe-4">上次阅读</th>
+					<th scope="col" class="pe-4">最新章节</th>
 					<th scope="col" class="pe-4">操作</th>
 				</tr>
 			</thead>
@@ -89,7 +89,7 @@
 				<td class="pe-4">${asset.name}</td>
 				<td class="pe-4">${asset.url}</td>
 				<td class="pe-4">${asset.version}</td>
-				<td class="pe-4">${asset.last_chapter}</td>
+				<td class="pe-4">${asset.latest_chapter}</td>
 				<td class="pe-4">
 					<button type="button" class="btn btn-outline-danger btn-sm">删除</button>
 				</td>`;
@@ -147,7 +147,7 @@
 					name: group.querySelector("td:nth-child(1) input").value.trim(),
 					url: group.querySelector("td:nth-child(2) input").value.trim(),
 					version: group.querySelector("td:nth-child(3) input").value.trim(),
-					last_chapter: group.querySelector("td:nth-child(4) input").value.trim()
+					latest_chapter: group.querySelector("td:nth-child(4) input").value.trim()
 				};
 				if (!asset.url) return toast("链接不可为空");
 				fetch("/config", {
@@ -156,7 +156,7 @@
 						name: asset.name,
 						url: asset.url,
 						version: asset.version,
-						last_chapter: asset.last_chapter
+						latest_chapter: asset.latest_chapter
 					}),
 					headers: new Headers({ "Content-Type": "application/json" })
 				})
