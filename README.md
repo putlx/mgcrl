@@ -39,6 +39,7 @@ For automated crawling, take `config.json` as an example.
 | ------- | -------- |
 | dmzj | https://www.dmzj.com/info/biaoren.html<br>https://www.dmzj1.com/info/biaoren.html<br>https://manhua.dmzj.com/tianlaizhishengdetianshi<br>https://manhua.dmzj1.com/tianlaizhishengdetianshi |
 | fzdm | https://manhua.fzdm.com/2/ |
+| guoguomh | https://mh.guoguomh.com/manhua/shiyouzhiguo/ |
 | katui | http://www.700mh.com/manhua/1436 |
 | laimanhua | https://www.laimanhua.com/kanmanhua/33952/ |
 | lsj | https://lsj.ac/comic/xugoutuile |

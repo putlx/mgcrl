@@ -26,6 +26,7 @@ var Extractors = []Extractor{
 	{regexp.MustCompile(`^https?://manhua\.dmzj1?\.com/\w+/?$`), Dmzj, DmzjImages},
 	{regexp.MustCompile(`^https?://www\.dmzj1?\.com/info/\w+\.html`), Dmzj2, Dmzj2Images},
 	{regexp.MustCompile(`^https?://manhua\.fzdm\.com/\d+/?`), Fzdm, FzdmImages},
+	{regexp.MustCompile(`^https?://mh\.guoguomh\.com/manhua/\w+/?`), Guoguomh, GuoguomhImages},
 	{regexp.MustCompile(`^https?://www\.700mh\.com/manhua/\d+/?$`), Katui, KatuiImages},
 	{regexp.MustCompile(`^https?://lsj\.ac/comic/\w+$`), Lsj, LsjImages},
 	{regexp.MustCompile(`^https?://www\.laimanhua\.com/kanmanhua/\d+/?$`), Laimanhua, LaimanhuaImages},
