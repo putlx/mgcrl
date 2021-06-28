@@ -44,19 +44,6 @@
 		</div>
 	</nav>
 
-	<div class="input-group my-3 px-3" id="output">
-		<span class="input-group-text">目录</span>
-		<input type="text" class="form-control">
-		<button class="btn btn-outline-secondary" type="button">保存</button>
-	</div>
-
-	<div class="input-group my-3 px-3" id="frequency">
-		<span class="input-group-text">更新间隔</span>
-		<input type="text" class="form-control">
-		<span class="input-group-text">小时</span>
-		<button class="btn btn-outline-secondary" type="button">保存</button>
-	</div>
-
 	<div class="table-responsive my-3 px-3">
 		<table class="table table-sm align-middle">
 			<thead>
@@ -81,37 +68,30 @@
 	</div>
 
 	<script>
-		let config;
+		let records;
 
-		function displayAsset(asset, prepend = false) {
+		function showRecord(record) {
 			const tr = document.createElement("tr");
 			tr.innerHTML = `
-				<td class="pe-4">${asset.name}</td>
-				<td class="pe-4">${asset.url}</td>
-				<td class="pe-4">${asset.version}</td>
-				<td class="pe-4">${asset.latest_chapter}</td>
+				<td class="pe-4">${record[0]}</td>
+				<td class="pe-4">${record[1]}</td>
+				<td class="pe-4">${record[2]}</td>
+				<td class="pe-4">${record[3]}</td>
 				<td class="pe-4">
 					<button type="button" class="btn btn-outline-danger btn-sm">删除</button>
 				</td>`;
 			const tbody = document.querySelector("tbody");
-			if (prepend) {
-				tbody.insertBefore(tr, tbody.querySelector("tr").nextSibling);
-			} else {
-				tbody.appendChild(tr);
-			}
+			tbody.insertBefore(tr, tbody.querySelector("tr").nextSibling);
 			tr.querySelector("button").onclick = function () {
-				fetch("/config", {
+				fetch("/records", {
 					method: "POST",
-					body: JSON.stringify({ remove: config.assets.indexOf(asset) + 1 }),
+					body: JSON.stringify({ remove: records.indexOf(record) }),
 					headers: new Headers({ "Content-Type": "application/json" })
 				})
 					.then(response => response.json())
 					.then(response => {
-						if (response === null) {
-							tr.remove();
-						} else {
-							toast(`错误：${response}。`);
-						}
+						if (response) return toast(`错误：${response}。`);
+						tr.remove();
 					})
 					.catch(error => {
 						toast(`错误：${error.message}。`);
@@ -121,18 +101,16 @@
 		}
 
 		window.addEventListener("load", function () {
-			fetch("/config")
+			fetch("/records")
 				.then(response => response.json())
 				.then(response => {
-					if (response === null) {
+					if (!response) {
 						toast("未指定配置文件。");
 					} else if (typeof response === "string") {
 						toast(`错误：${response}。`);
 					} else {
-						config = response;
-						document.querySelector("#output input").value = response.output;
-						document.querySelector("#frequency input").value = response.frequency_in_hour;
-						response.assets.forEach(asset => displayAsset(asset));
+						records = response;
+						Array.from(records).reverse().forEach(showRecord);
 					}
 				})
 				.catch(error => {
@@ -141,86 +119,31 @@
 				});
 
 			document.querySelector("tbody tr td button").onclick = function () {
-				if (!config) return toast("未指定配置文件。");
+				if (!records) return toast("未指定配置文件。");
 				const group = document.querySelector("tbody tr");
-				const asset = {
-					name: group.querySelector("td:nth-child(1) input").value.trim(),
-					url: group.querySelector("td:nth-child(2) input").value.trim(),
-					version: group.querySelector("td:nth-child(3) input").value.trim(),
-					latest_chapter: group.querySelector("td:nth-child(4) input").value.trim()
-				};
-				if (!asset.url) return toast("链接不可为空");
-				fetch("/config", {
+				const record = [
+					group.querySelector("td:nth-child(1) input").value.trim(),
+					group.querySelector("td:nth-child(2) input").value.trim(),
+					group.querySelector("td:nth-child(3) input").value.trim(),
+					group.querySelector("td:nth-child(4) input").value.trim(),
+				];
+				if (!record[1]) return toast("链接不可为空");
+				fetch("/records", {
 					method: "POST",
-					body: JSON.stringify({
-						name: asset.name,
-						url: asset.url,
-						version: asset.version,
-						latest_chapter: asset.latest_chapter
-					}),
+					body: JSON.stringify({ record: record }),
 					headers: new Headers({ "Content-Type": "application/json" })
 				})
 					.then(response => response.json())
 					.then(response => {
-						if (response === null) {
-							config.assets.unshift(asset);
-							displayAsset(asset, true);
-						} else {
-							toast(`错误：${response}。`);
-						}
+						if (response) return toast(`错误：${response}。`);
+						records.unshift(record);
+						showRecord(record);
+						group.querySelector("td:nth-child(1) input").value = "";
+						group.querySelector("td:nth-child(2) input").value = "";
+						group.querySelector("td:nth-child(3) input").value = "";
+						group.querySelector("td:nth-child(4) input").value = "";
 					})
 					.catch(error => {
-						toast(`错误：${error.message}。`);
-						console.log(error);
-					});
-			};
-
-			document.querySelector("#output button").onclick = function () {
-				if (!config) return toast("未指定配置文件。");
-				const output = document.querySelector("#output input").value.trim();
-				fetch("/config", {
-					method: "POST",
-					body: JSON.stringify({ output: output }),
-					headers: new Headers({ "Content-Type": "application/json" })
-				})
-					.then(response => response.json())
-					.then(response => {
-						if (response === null) {
-							config.output = output;
-						} else {
-							document.querySelector("#output input").value = config.output;
-							toast(`错误：${response}。`);
-						}
-					})
-					.catch(error => {
-						document.querySelector("#output input").value = config.output;
-						toast(`错误：${error.message}。`);
-						console.log(error);
-					});
-			};
-
-			document.querySelector("#frequency button").onclick = function () {
-				if (!config) return toast("未指定配置文件。");
-				let frequency = document.querySelector("#frequency input").value.trim();
-				if (!frequency || isNaN(frequency = parseInt(frequency)) || frequency <= 0) {
-					return toast("更新间隔应为正整数。");
-				}
-				fetch("/config", {
-					method: "POST",
-					body: JSON.stringify({ frequency_in_hour: frequency }),
-					headers: new Headers({ "Content-Type": "application/json" })
-				})
-					.then(response => response.json())
-					.then(response => {
-						if (response === null) {
-							config.frequency_in_hour = frequency;
-						} else {
-							document.querySelector("#frequency input").value = config.frequency_in_hour;
-							toast(`错误：${response}。`);
-						}
-					})
-					.catch(error => {
-						document.querySelector("#frequency input").value = config.frequency_in_hour;
 						toast(`错误：${error.message}。`);
 						console.log(error);
 					});

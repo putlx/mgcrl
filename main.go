@@ -46,13 +46,16 @@ func main() {
 		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions for serve:")
 		svFlags.PrintDefaults()
 	}
-	var version, selector, output, config, logFile string
-	var maxRetry int
+	var version, selector, output, csvFile, logFile string
+	var maxRetry, frequency uint
 	dlFlags.StringVar(&version, "v", "", "manga version")
 	dlFlags.StringVar(&selector, "c", "1:-1", "volumes or chapters")
 	dlFlags.StringVar(&output, "o", ".", "output directory")
-	dlFlags.IntVar(&maxRetry, "m", 3, "max retry time")
-	svFlags.StringVar(&config, "f", "", "auto crawl manga according to the config file")
+	dlFlags.UintVar(&maxRetry, "m", 3, "max retry time")
+	svFlags.StringVar(&csvFile, "c", "", "csv file contains manga records")
+	svFlags.StringVar(&output, "o", ".", "output directory")
+	svFlags.UintVar(&maxRetry, "m", 3, "max retry time")
+	svFlags.UintVar(&frequency, "f", 5, "update frequency in hour")
 	svFlags.StringVar(&logFile, "l", "", "redirect log to file")
 
 	enabled := true
@@ -73,10 +76,12 @@ func main() {
 			if len(logFile) != 0 {
 				w = util.NewWriter(logFile)
 			}
-			if len(config) != 0 {
-				go com.AutoCrawl(config, log.New(w, "[autocrawl] ", log.LstdFlags|log.Lmsgprefix))
+			if len(csvFile) != 0 {
+				logger := log.New(w, "[autocrawl] ", log.LstdFlags|log.Lmsgprefix)
+				go com.AutoCrawl(csvFile, output, frequency, maxRetry, logger)
 			}
-			webui.Serve(port, config, logFile, log.New(w, "[webui] ", log.LstdFlags|log.Lmsgprefix))
+			logger := log.New(w, "[webui] ", log.LstdFlags|log.Lmsgprefix)
+			webui.Serve(port, output, csvFile, logFile, maxRetry, frequency, logger)
 		}
 		return
 	} else if os.Args[1] != "get" {

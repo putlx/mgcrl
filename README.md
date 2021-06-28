@@ -7,7 +7,7 @@ Usage: mgcrl get <URL> [options]
 Options for get:
   -c string
         volumes or chapters (default "1:-1")
-  -m int
+  -m uint
         max retry time (default 3)
   -o string
         output directory (default ".")
@@ -15,13 +15,19 @@ Options for get:
         manga version
 
 Options for serve:
-  -f string
-        auto crawl manga according to the config file
+  -c string
+        csv file contains manga records
+  -f uint
+        update frequency in hour (default 5)
   -l string
         redirect log to file
+  -m uint
+        max retry time (default 3)
+  -o string
+        output directory (default ".")
 ```
 
-Option `-c` is followed by argument with the format of `from[:to][,from[:to]]...` where `from` and `to` can both be chapter title or index.
+Option `-c` for `get` is followed by argument with the format of `from[:to][,from[:to]]...` where `from` and `to` can both be chapter title or index.
 
 ## Example
 
@@ -31,7 +37,7 @@ Execute `mgcrl get https://www.mhgui.com/comic/4683/ -v=单行本 -c=1:第03卷`
 
 Execute `mgcrl serve <PORT>` and open `http://localhost:<PORT>/` in your browser to access WebUI.
 
-For automated crawling, take `config.json` as an example.
+For automated crawling, take `manga.csv` as an example. Per record contains 4 fields: `name`, `url`, `version` and `latest chapter`.
 
 ## Supported Websites
 

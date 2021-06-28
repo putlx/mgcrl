@@ -15,6 +15,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/putlx/mgcrl/com"
+	"github.com/putlx/mgcrl/util"
 )
 
 //go:embed index.html
@@ -51,7 +52,7 @@ type Task struct {
 	com.Progress
 }
 
-func Serve(port int, configFile, logFile string, log *log.Logger) {
+func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log *log.Logger) {
 	var id = make(chan int)
 	var tc = make(chan Task)
 	var crawler atomic.Value
@@ -167,7 +168,7 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 		var URL string
 		if err := readJSON(req, &URL); err != nil {
 			writeJSON(w, err.Error())
-		} else if c, err := com.NewCrawler(URL, "", ".", 3); err != nil {
+		} else if c, err := com.NewCrawler(URL, "", output, maxRetry); err != nil {
 			writeJSON(w, err.Error())
 		} else {
 			writeJSON(w, c.Chapters)
@@ -259,37 +260,33 @@ func Serve(port int, configFile, logFile string, log *log.Logger) {
 		}
 	})
 
-	http.HandleFunc("/config", func(w http.ResponseWriter, req *http.Request) {
-		if len(configFile) == 0 {
-			writeJSON(w, nil)
-		} else if req.Method == "GET" {
-			if c, err := com.NewConfig(configFile); err != nil {
-				writeJSON(w, err.Error())
+	http.HandleFunc("/records", func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == "GET" {
+			if len(csv) == 0 {
+				writeJSON(w, nil)
 			} else {
-				writeJSON(w, c)
+				if records, err := util.ReadCSV(csv); err != nil {
+					writeJSON(w, err.Error())
+				} else {
+					writeJSON(w, records)
+				}
 			}
 		} else {
-			var u struct {
-				Remove    int    `json:"remove"`
-				Frequency int    `json:"frequency_in_hour"`
-				Output    string `json:"output"`
-				com.Asset
+			var r struct {
+				Remove int
+				Record []string
 			}
-			if err := readJSON(req, &u); err != nil {
+			if err := readJSON(req, &r); err != nil {
 				writeJSON(w, err.Error())
-			} else if c, err := com.NewConfig(configFile); err != nil {
+			} else if records, err := util.ReadCSV(csv); err != nil {
 				writeJSON(w, err.Error())
 			} else {
-				if u.Remove > 0 {
-					c.Assets = append(c.Assets[:u.Remove-1], c.Assets[u.Remove:]...)
-				} else if len(u.URL) > 0 {
-					c.Assets = append([]com.Asset{u.Asset}, c.Assets...)
-				} else if len(u.Output) > 0 {
-					c.Output = u.Output
-				} else if u.Frequency > 0 {
-					c.Frequency = u.Frequency
+				if len(r.Record) > 0 {
+					records = append([][]string{r.Record}, records...)
+				} else {
+					records = append(records[:r.Remove], records[r.Remove+1:]...)
 				}
-				if err = c.Save(); err != nil {
+				if err = util.WriteCSV(csv, records); err != nil {
 					writeJSON(w, err.Error())
 				} else {
 					writeJSON(w, nil)

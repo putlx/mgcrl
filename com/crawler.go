@@ -20,7 +20,7 @@ type Crawler struct {
 	ext.Manga
 	URL      string
 	Output   string
-	MaxRetry int
+	MaxRetry uint
 }
 
 type Progress struct {
@@ -33,15 +33,12 @@ type Error struct {
 	Error    string `json:"error"`
 }
 
-func NewCrawler(URL, ver, output string, maxRetry int) (*Crawler, error) {
+func NewCrawler(URL, version, output string, maxRetry uint) (*Crawler, error) {
 	for _, e := range ext.Extractors {
 		if e.URLRegexp.MatchString(URL) {
-			if maxRetry < 0 {
-				maxRetry = int(^uint(0) >> 1)
-			}
 			var lastErr error
-			for t := -1; t < maxRetry; t++ {
-				m, err := e.GetManga(URL, ver)
+			for t := uint(0); t < maxRetry+1; t++ {
+				m, err := e.GetManga(URL, version)
 				if err == nil {
 					return &Crawler{e, m, URL, output, maxRetry}, nil
 				}
@@ -95,9 +92,9 @@ func (c *Crawler) FetchChapter(idx int) (<-chan Progress, <-chan *Error, <-chan 
 			}
 			name := fmt.Sprintf("%03d", i+1) + extFinder.FindStringSubmatch(URL.Path)[1]
 
-			for t := -1; t < c.MaxRetry; t++ {
+			for t := uint(0); t < c.MaxRetry+1; t++ {
 				if c.Delay > 0 {
-					if t == -1 {
+					if t == 0 {
 						time.Sleep(time.Duration(i) * c.Delay)
 					} else {
 						time.Sleep(c.Delay + time.Duration(rand.Int()%100)*time.Millisecond)
