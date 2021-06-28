@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sync"
 	"sync/atomic"
@@ -53,6 +54,10 @@ type Task struct {
 }
 
 func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log *log.Logger) {
+	output, err := filepath.Abs(output)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	var id = make(chan int)
 	var tc = make(chan Task)
 	var crawler atomic.Value
@@ -84,7 +89,7 @@ func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log 
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(html)
+		w.Write(bytes.Replace(html, []byte("{{output}}"), []byte(output), 1))
 	})
 
 	http.HandleFunc("/index.js", func(w http.ResponseWriter, req *http.Request) {

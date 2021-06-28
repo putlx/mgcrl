@@ -58,7 +58,10 @@
 				<button type="button" class="btn btn-outline-secondary btn-sm">全选</button>
 				<button type="button" class="btn btn-outline-secondary btn-sm">全不选</button>
 			</div>
-			<input type="text" class="form-control" placeholder="目录" id="directory">
+			<div class="form-floating">
+				<input type="text" class="form-control" placeholder="目录" id="directory" value="{{output}}">
+				<label for="directory">保存到</label>
+			</div>
 			<button class="btn btn-primary" type="button">下载选中的章节</button>
 		</div>
 		<div class="tasks table-responsive" style="overflow-y: scroll;">
