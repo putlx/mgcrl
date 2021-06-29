@@ -44,7 +44,7 @@ var autocrawl []byte
 var favicon []byte
 
 type Task struct {
-	ID      int          `json:"id"`
+	ID      uint32       `json:"id"`
 	Manga   string       `json:"manga"`
 	Chapter string       `json:"chapter"`
 	Errors  []*com.Error `json:"errors"`
@@ -58,16 +58,11 @@ func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log 
 	if err != nil {
 		log.Fatalln(err)
 	}
-	var id = make(chan int)
-	var tc = make(chan Task)
+	var update = make(chan Task)
+	var id uint32
 	var crawler atomic.Value
 	var tasks = &sync.Map{}
 	var upgrader = websocket.Upgrader{}
-	go func() {
-		for i := 0; ; i++ {
-			id <- i
-		}
-	}()
 
 	writeJSON := func(w http.ResponseWriter, v interface{}) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -205,12 +200,12 @@ func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log 
 		for _, idx := range r.Indexes {
 			go func(idx int, c *com.Crawler) {
 				t := Task{
-					ID:      <-id,
+					ID:      atomic.AddUint32(&id, 1),
 					Manga:   c.Title,
 					Chapter: c.Chapters[idx].Title,
 					mutex:   &sync.Mutex{},
 				}
-				tc <- t
+				update <- t
 				tasks.Store(t.ID, &t)
 				prg, errs, done := c.FetchChapter(idx)
 				for {
@@ -218,17 +213,17 @@ func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log 
 					case s := <-prg:
 						t.mutex.Lock()
 						t.Progress = s
-						tc <- t
+						update <- t
 						t.mutex.Unlock()
 					case err := <-errs:
 						t.mutex.Lock()
 						t.Errors = append(t.Errors, err)
-						tc <- t
+						update <- t
 						t.mutex.Unlock()
 					case <-done:
 						t.mutex.Lock()
 						t.Done = true
-						tc <- t
+						update <- t
 						t.mutex.Unlock()
 						return
 					}
@@ -256,7 +251,7 @@ func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log 
 			return true
 		})
 		for {
-			if err := c.WriteJSON(<-tc); err != nil {
+			if err := c.WriteJSON(<-update); err != nil {
 				log.Println(err)
 			}
 		}
