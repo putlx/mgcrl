@@ -240,6 +240,18 @@ func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log 
 			return
 		}
 		defer c.Close()
+		c.SetCloseHandler(func(_ int, _ string) error {
+			crawler = atomic.Value{}
+			return nil
+		})
+		go func() {
+			for {
+				if _, _, err := c.NextReader(); err != nil {
+					c.Close()
+					break
+				}
+			}
+		}()
 		tasks.Range(func(key, value interface{}) bool {
 			v := value.(*Task)
 			v.mutex.Lock()
