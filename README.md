@@ -3,6 +3,7 @@
 ```
 Usage: mgcrl get <URL> [options]
        mgcrl serve <PORT> [options]
+       mgcrl help
 
 Options for get:
   -c string
@@ -16,9 +17,9 @@ Options for get:
 
 Options for serve:
   -c string
-        csv file contains manga records
+        csv file contains manga records used for auto crawling
   -f uint
-        update frequency in hour (default 5)
+        update frequency in hour (default 6)
   -l string
         redirect log to file
   -m uint
