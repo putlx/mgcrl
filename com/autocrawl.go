@@ -23,8 +23,9 @@ func AutoCrawl(csv, output string, frequency, maxRetry uint, log *log.Logger) {
 		for _, record := range records {
 			if len(record) != 4 {
 				const msg = "each record should have 4 fields"
+				log.Println(msg)
 				beeep.Notify("错误", msg, "")
-				log.Fatalln(msg)
+				continue
 			}
 			c, err := NewCrawler(record[1], record[2], output, maxRetry)
 			if err != nil {
@@ -53,22 +54,21 @@ func AutoCrawl(csv, output string, frequency, maxRetry uint, log *log.Logger) {
 				for t := uint(0); t < maxRetry+1; t++ {
 					if t > 0 {
 						time.Sleep(duration)
-						log.Println("retry crawling " + title)
 					}
 					prg, errs, done := c.FetchChapter(idx)
 					var err *Error
-				loop:
+				progress:
 					for {
 						select {
 						case <-prg:
 						case err = <-errs:
 							log.Println(err)
 						case <-done:
-							break loop
+							break progress
 						}
 					}
 					if err == nil {
-						log.Println(title + " is downloaded")
+						log.Println(title, "is downloaded")
 						beeep.Notify("下载完成", title+"下载完毕。", "")
 						record[3] = c.Chapters[idx].Title
 						if err := util.WriteCSV(csv, records); err != nil {
@@ -76,6 +76,8 @@ func AutoCrawl(csv, output string, frequency, maxRetry uint, log *log.Logger) {
 							beeep.Notify("错误", err.Error(), "")
 						}
 						break
+					} else if t == maxRetry {
+						log.Println("fail to get", title)
 					}
 				}
 			}
