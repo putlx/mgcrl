@@ -54,18 +54,16 @@ window.addEventListener("load", function () {
 
 	document.querySelector("#url button").addEventListener("click", function () {
 		const url = document.querySelector("#url input").value.trim();
-		if (!url) {
-			return toast("链接不可为空。");
-		}
+		if (!url) return toast("链接不可为空。");
 
 		document.querySelectorAll(".control button").forEach(e => e.disabled = true);
-		fetch("/get", {
-			method: "POST",
+		fetch(location.href, {
+			method: "PUT",
 			body: JSON.stringify(url),
 			headers: new Headers({ "Content-Type": "application/json" })
 		})
 			.then(response => response.json())
-			.then(function (response) {
+			.then(response => {
 				if (typeof response === "string") {
 					if (response === "unsupported URL") {
 						toast("该链接不受支持。");
@@ -82,13 +80,11 @@ window.addEventListener("load", function () {
 						.join("");
 				}
 			})
-			.catch(function (error) {
+			.catch(error => {
 				toast(`错误：${error.message}。`);
 				console.log(error);
 			})
-			.finally(function () {
-				document.querySelectorAll(".control button").forEach(e => e.disabled = false);
-			});
+			.finally(() => document.querySelectorAll(".control button").forEach(e => e.disabled = false));
 	});
 
 	document.querySelector(".control > button").addEventListener("click", function () {
@@ -96,7 +92,7 @@ window.addEventListener("load", function () {
 			.reduce((list, chapter, index) => chapter.checked ? list.push(index) && list : list, []);
 		if (indexes.length) {
 			document.querySelectorAll(".control button").forEach(e => e.disabled = true);
-			fetch("/download", {
+			fetch(location.href, {
 				method: "POST",
 				body: JSON.stringify({
 					indexes: indexes,
@@ -104,19 +100,17 @@ window.addEventListener("load", function () {
 				}),
 				headers: new Headers({ "Content-Type": "application/json" })
 			})
-				.then(response => response.json())
-				.then(function (response) {
-					if (typeof response === "string") {
+				.then(response => response.text())
+				.then(response => {
+					if (response) {
 						toast(`错误：${response}。`);
 					}
 				})
-				.catch(function (error) {
+				.catch(error => {
 					toast(`错误：${error.message}。`);
 					console.log(error);
 				})
-				.finally(function () {
-					document.querySelectorAll(".control button").forEach(e => e.disabled = false);
-				});
+				.finally(() => document.querySelectorAll(".control button").forEach(e => e.disabled = false));
 		} else {
 			toast("没有选中任何章节。");
 		}
@@ -140,21 +134,21 @@ function appendTask(task) {
 		</td>`;
 	task.element = document.querySelector(".tasks > table > tbody").appendChild(tr);
 	tr.querySelector("button").onclick = function () {
-		fetch("/delete", {
-			method: "POST",
+		fetch(location.href, {
+			method: "DELETE",
 			body: JSON.stringify(task.id),
 			headers: new Headers({ "Content-Type": "application/json" })
 		})
-			.then(response => response.json())
-			.then(function (response) {
-				if (response === null) {
+			.then(response => response.text())
+			.then(response => {
+				if (response) {
+					toast(`错误：${response}。`);
+				} else {
 					task.element.remove();
 					tasks.delete(task.id);
-				} else {
-					toast(`错误：${response}。`);
 				}
 			})
-			.catch(function (error) {
+			.catch(error => {
 				toast(`错误：${error.message}。`);
 				console.log(error);
 			});

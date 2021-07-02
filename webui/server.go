@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -28,20 +29,22 @@ var js []byte
 //go:embed style.css
 var css []byte
 
-//go:embed reader.html
-var reader []byte
-
-//go:embed log.html
-var logHtml []byte
-
 //go:embed toast.js
 var toast []byte
+
+//go:embed favicon.ico
+var favicon []byte
+
+//go:embed reader.html
+var reader []byte
 
 //go:embed autocrawl.html
 var autocrawl []byte
 
-//go:embed favicon.ico
-var favicon []byte
+//go:embed log.html
+var logHTML []byte
+
+var logParser = regexp.MustCompile(`(\d{4}/\d{2}/\d{2}) (\d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)`)
 
 type Task struct {
 	ID      uint32       `json:"id"`
@@ -51,6 +54,23 @@ type Task struct {
 	Done    bool         `json:"done"`
 	mutex   *sync.Mutex
 	com.Progress
+}
+
+func writeJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	w.Write(data)
+}
+
+func readJSON(req *http.Request, v interface{}) error {
+	data, err := io.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, v)
 }
 
 func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log *log.Logger) {
@@ -64,173 +84,79 @@ func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log 
 	var tasks = &sync.Map{}
 	var upgrader = websocket.Upgrader{}
 
-	writeJSON := func(w http.ResponseWriter, v interface{}) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		if data, err := json.Marshal(v); err != nil {
-			log.Fatalln(err)
-		} else if _, err = w.Write(data); err != nil {
-			log.Println(err)
-		}
-	}
-
-	readJSON := func(req *http.Request, v interface{}) error {
-		if data, err := io.ReadAll(req.Body); err != nil {
-			return err
-		} else if err = json.Unmarshal(data, v); err != nil {
-			return err
-		}
-		return nil
-	}
-
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(bytes.Replace(html, []byte("{{output}}"), []byte(output), 1))
-	})
+		switch req.Method {
+		case "GET":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write(bytes.Replace(html, []byte("{{output}}"), []byte(output), 1))
+		case "PUT":
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			var URL string
+			if err := readJSON(req, &URL); err != nil {
+				writeJSON(w, err.Error())
+			} else if c, err := com.NewCrawler(URL, "", output, maxRetry); err != nil {
+				writeJSON(w, err.Error())
+			} else {
+				writeJSON(w, c.Chapters)
+				crawler.Store(c)
+			}
+		case "POST":
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			var r struct {
+				Indexes []int
+				Output  string
+			}
+			if err := readJSON(req, &r); err != nil {
+				w.Write([]byte(err.Error()))
+				return
+			}
 
-	http.HandleFunc("/index.js", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-		w.Write(js)
-	})
-
-	http.HandleFunc("/toast.js", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-		w.Write(toast)
-	})
-
-	http.HandleFunc("/style.css", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-		w.Write(css)
-	})
-
-	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "image/x-icon")
-		w.Write(favicon)
-	})
-
-	http.HandleFunc("/reader", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(reader)
-	})
-
-	http.HandleFunc("/autocrawl", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(autocrawl)
-	})
-
-	http.HandleFunc("/log", func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == "POST" {
-			if len(logFile) != 0 {
-				if _, err := os.Stat(logFile); err == nil {
-					if err = os.Remove(logFile); err != nil {
-						log.Println(err)
+			c := *crawler.Load().(*com.Crawler)
+			if len(r.Output) != 0 {
+				c.Output = r.Output
+			}
+			for _, idx := range r.Indexes {
+				go func(idx int, c *com.Crawler) {
+					t := Task{
+						ID:      atomic.AddUint32(&id, 1),
+						Manga:   c.Title,
+						Chapter: c.Chapters[idx].Title,
+						mutex:   &sync.Mutex{},
 					}
-				}
-			}
-			return
-		}
-
-		idx := bytes.Index(logHtml, []byte("{{}}"))
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if f, err := os.Open(logFile); err != nil {
-			if os.IsNotExist(err) {
-				w.Write(logHtml[:idx])
-				w.Write(logHtml[idx+4:])
-			} else {
-				w.Write([]byte(err.Error()))
-			}
-		} else {
-			defer f.Close()
-			if data, err := io.ReadAll(f); err != nil {
-				w.Write([]byte(err.Error()))
-			} else {
-				w.Write(logHtml[:idx])
-				rows := bytes.Split(data, []byte("\n"))
-				for i := len(rows) - 1; i >= 0; i-- {
-					if len(rows[i]) > 0 {
-						w.Write([]byte(`<tr>`))
-						for _, m := range regexp.MustCompile(`(\d{4}/\d{2}/\d{2}) (\d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)`).FindSubmatch(rows[i])[1:] {
-							w.Write([]byte(`<td class="pe-4">`))
-							w.Write(m)
-							w.Write([]byte(`</td>`))
+					update <- t
+					tasks.Store(t.ID, &t)
+					prg, errs, done := c.FetchChapter(idx)
+					for {
+						select {
+						case s := <-prg:
+							t.mutex.Lock()
+							t.Progress = s
+							update <- t
+							t.mutex.Unlock()
+						case err := <-errs:
+							t.mutex.Lock()
+							t.Errors = append(t.Errors, err)
+							update <- t
+							t.mutex.Unlock()
+						case <-done:
+							t.mutex.Lock()
+							t.Done = true
+							update <- t
+							t.mutex.Unlock()
+							return
 						}
-						w.Write([]byte(`</tr>`))
 					}
-				}
-				w.Write(logHtml[idx+4:])
+				}(idx, &c)
+			}
+		case "DELETE":
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			var ID uint32
+			if err := readJSON(req, &ID); err != nil {
+				w.Write([]byte(err.Error()))
+			} else {
+				tasks.Delete(ID)
 			}
 		}
-	})
-
-	http.HandleFunc("/get", func(w http.ResponseWriter, req *http.Request) {
-		var URL string
-		if err := readJSON(req, &URL); err != nil {
-			writeJSON(w, err.Error())
-		} else if c, err := com.NewCrawler(URL, "", output, maxRetry); err != nil {
-			writeJSON(w, err.Error())
-		} else {
-			writeJSON(w, c.Chapters)
-			crawler.Store(c)
-		}
-	})
-
-	http.HandleFunc("/delete", func(w http.ResponseWriter, req *http.Request) {
-		var ID int
-		if err := readJSON(req, &ID); err != nil {
-			writeJSON(w, err.Error())
-		} else {
-			tasks.Delete(ID)
-			writeJSON(w, nil)
-		}
-	})
-
-	http.HandleFunc("/download", func(w http.ResponseWriter, req *http.Request) {
-		var r struct {
-			Indexes []int
-			Output  string
-		}
-		if err := readJSON(req, &r); err != nil {
-			writeJSON(w, err.Error())
-			return
-		}
-
-		c := *crawler.Load().(*com.Crawler)
-		if len(r.Output) != 0 {
-			c.Output = r.Output
-		}
-		for _, idx := range r.Indexes {
-			go func(idx int, c *com.Crawler) {
-				t := Task{
-					ID:      atomic.AddUint32(&id, 1),
-					Manga:   c.Title,
-					Chapter: c.Chapters[idx].Title,
-					mutex:   &sync.Mutex{},
-				}
-				update <- t
-				tasks.Store(t.ID, &t)
-				prg, errs, done := c.FetchChapter(idx)
-				for {
-					select {
-					case s := <-prg:
-						t.mutex.Lock()
-						t.Progress = s
-						update <- t
-						t.mutex.Unlock()
-					case err := <-errs:
-						t.mutex.Lock()
-						t.Errors = append(t.Errors, err)
-						update <- t
-						t.mutex.Unlock()
-					case <-done:
-						t.mutex.Lock()
-						t.Done = true
-						update <- t
-						t.mutex.Unlock()
-						return
-					}
-				}
-			}(idx, &c)
-		}
-		writeJSON(w, nil)
 	})
 
 	http.HandleFunc("/downloading", func(w http.ResponseWriter, req *http.Request) {
@@ -269,37 +195,113 @@ func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log 
 		}
 	})
 
-	http.HandleFunc("/records", func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == "GET" {
+	http.HandleFunc("/index.js", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		w.Write(js)
+	})
+
+	http.HandleFunc("/toast.js", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		w.Write(toast)
+	})
+
+	http.HandleFunc("/style.css", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		w.Write(css)
+	})
+
+	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "image/x-icon")
+		w.Write(favicon)
+	})
+
+	http.HandleFunc("/reader", func(w http.ResponseWriter, req *http.Request) {
+		switch req.Method {
+		case "GET":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write(reader)
+		}
+	})
+
+	http.HandleFunc("/autocrawl", func(w http.ResponseWriter, req *http.Request) {
+		switch req.Method {
+		case "GET":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write(autocrawl)
+		case "PUT":
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			if len(csv) == 0 {
 				writeJSON(w, nil)
-			} else {
-				if records, err := util.ReadCSV(csv); err != nil {
-					writeJSON(w, err.Error())
-				} else {
-					writeJSON(w, records)
-				}
-			}
-		} else {
-			var r struct {
-				Remove int
-				Record []string
-			}
-			if err := readJSON(req, &r); err != nil {
-				writeJSON(w, err.Error())
 			} else if records, err := util.ReadCSV(csv); err != nil {
 				writeJSON(w, err.Error())
 			} else {
-				if len(r.Record) > 0 {
-					records = append([][]string{r.Record}, records...)
-				} else {
-					records = append(records[:r.Remove], records[r.Remove+1:]...)
+				writeJSON(w, records)
+			}
+		case "POST":
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			var record []string
+			if err := readJSON(req, &record); err != nil {
+				w.Write([]byte(err.Error()))
+			} else if records, err := util.ReadCSV(csv); err != nil {
+				w.Write([]byte(err.Error()))
+			} else {
+				records = append([][]string{record}, records...)
+				if err := util.WriteCSV(csv, records); err != nil {
+					w.Write([]byte(err.Error()))
 				}
-				if err = util.WriteCSV(csv, records); err != nil {
+			}
+		case "DELETE":
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			var remove int
+			if err := readJSON(req, &remove); err != nil {
+				w.Write([]byte(err.Error()))
+			} else if records, err := util.ReadCSV(csv); err != nil {
+				w.Write([]byte(err.Error()))
+			} else {
+				records = append(records[:remove], records[remove+1:]...)
+				if err := util.WriteCSV(csv, records); err != nil {
+					w.Write([]byte(err.Error()))
+				}
+			}
+		}
+	})
+
+	http.HandleFunc("/log", func(w http.ResponseWriter, req *http.Request) {
+		switch req.Method {
+		case "GET":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write(logHTML)
+		case "DELETE":
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			if _, err := os.Stat(logFile); err == nil {
+				if err := os.Remove(logFile); err != nil {
+					w.Write([]byte(err.Error()))
+				}
+			} else if !os.IsNotExist(err) {
+				w.Write([]byte(err.Error()))
+			}
+		case "PUT":
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			var logs = make([][]string, 0)
+			if len(logFile) == 0 {
+				writeJSON(w, nil)
+			} else if f, err := os.Open(logFile); err == nil {
+				defer f.Close()
+				if data, err := io.ReadAll(f); err != nil {
 					writeJSON(w, err.Error())
 				} else {
-					writeJSON(w, nil)
+					rows := strings.Split(string(data), "\n")
+					for i := len(rows) - 1; i >= 0; i-- {
+						if len(rows[i]) > 0 {
+							logs = append(logs, logParser.FindStringSubmatch(rows[i])[1:])
+						}
+					}
+					writeJSON(w, logs)
 				}
+			} else if os.IsNotExist(err) {
+				writeJSON(w, logs)
+			} else {
+				writeJSON(w, err.Error())
 			}
 		}
 	})
