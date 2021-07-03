@@ -1,8 +1,10 @@
 package webui
 
 import (
+	"archive/zip"
 	"bytes"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -220,6 +222,106 @@ func Serve(port int, output, csv, logFile string, maxRetry, frequency uint, log 
 		case "GET":
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write(reader)
+		case "PUT":
+			type File struct {
+				Name  string `json:"name"`
+				IsDir bool   `json:"is_dir"`
+			}
+
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			var path string
+			if err := readJSON(req, &path); err != nil {
+				writeJSON(w, err.Error())
+				return
+			} else if len(path) == 0 {
+				path = output
+			}
+			f, err := os.Stat(path)
+			if err != nil {
+				writeJSON(w, err.Error())
+				return
+			}
+			var resp struct {
+				Path   string   `json:"path"`
+				Files  []File   `json:"files"`
+				Images []string `json:"images"`
+			}
+			if f.IsDir() {
+				resp.Path, err = filepath.Abs(path)
+			} else {
+				resp.Path, err = filepath.Abs(path + "/..")
+			}
+			if err != nil {
+				panic(err)
+			}
+			files, err := os.ReadDir(resp.Path)
+			if err != nil {
+				writeJSON(w, err.Error())
+				return
+			}
+			resp.Files = append(resp.Files, File{"..", true})
+			for _, file := range files {
+				if file.IsDir() || file.Type().IsRegular() {
+					resp.Files = append(resp.Files, File{file.Name(), file.IsDir()})
+				}
+				if f.IsDir() && file.Type().IsRegular() && util.IsImageFile(file.Name()) {
+					if f, err := os.Open(resp.Path + "/" + file.Name()); err != nil {
+						log.Println(err)
+					} else if data, err := io.ReadAll(f); err != nil {
+						log.Println(err)
+						f.Close()
+					} else {
+						resp.Images = append(resp.Images, base64.StdEncoding.EncodeToString(data))
+						f.Close()
+					}
+				}
+			}
+			if !f.IsDir() {
+				r, err := zip.OpenReader(path)
+				if err != nil {
+					writeJSON(w, err.Error())
+					return
+				}
+				defer r.Close()
+				for _, f := range r.File {
+					if util.IsImageFile(f.Name) {
+						if rc, err := f.Open(); err != nil {
+							log.Println(err)
+						} else if data, err := io.ReadAll(rc); err != nil {
+							log.Println(err)
+							rc.Close()
+						} else {
+							resp.Images = append(resp.Images, base64.StdEncoding.EncodeToString(data))
+							rc.Close()
+						}
+					}
+				}
+			}
+			writeJSON(w, resp)
+		case "DELETE":
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			var path string
+			var resp struct {
+				Ok      bool   `json:"ok"`
+				Message string `json:"message"`
+			}
+			if err := readJSON(req, &path); err != nil {
+				resp.Message = err.Error()
+			} else if err := os.RemoveAll(path); err != nil {
+				resp.Message = err.Error()
+			} else {
+				for {
+					path, err = filepath.Abs(path + "/..")
+					if err != nil {
+						break
+					} else if err := os.Remove(path); err != nil {
+						break
+					}
+				}
+				resp.Ok = true
+				resp.Message = path
+			}
+			writeJSON(w, resp)
 		}
 	})
 

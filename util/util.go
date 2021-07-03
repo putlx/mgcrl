@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"io"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -47,4 +48,21 @@ func AsFileBasename(name string) string {
 		}
 		return c
 	}, name)
+}
+
+var imageTypes = map[string]struct{}{
+	".tiff": {},
+	".bmp":  {},
+	".gif":  {},
+	".svg":  {},
+	".png":  {},
+	".jpeg": {},
+	".jpg":  {},
+	".webp": {},
+	".ico":  {},
+}
+
+func IsImageFile(name string) bool {
+	_, exists := imageTypes[strings.ToLower(filepath.Ext(name))]
+	return exists
 }
