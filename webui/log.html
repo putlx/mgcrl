@@ -52,13 +52,17 @@
 					if (response === null) {
 						toast("未指定日志文件。");
 					} else if (typeof response === "string") {
-						toast(response);
+						toast(`错误：${response}。`);
 					} else {
 						logs = response;
 						document.querySelector("tbody").innerHTML = logs
 							.map(row => "<tr>" + row.map(e => `<td class="pe-4">${e}</td>`).join("") + "</tr>")
 							.join("");
 					}
+				})
+				.catch(error => {
+					toast(`错误：${error.message}。`);
+					console.log(error);
 				});
 		}
 
@@ -71,10 +75,14 @@
 					.then(response => response.text())
 					.then(response => {
 						if (response) {
-							toast(response);
+							toast(`错误：${response}。`);
 						} else {
 							loadLog();
 						}
+					})
+					.catch(error => {
+						toast(`错误：${error.message}。`);
+						console.log(error);
 					});
 			});
 		});
