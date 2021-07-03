@@ -32,7 +32,7 @@ func GuoguomhImages(URL string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	text = regexp.MustCompile(`var chapterImages = \[(.+?)\]`).FindStringSubmatch(text)[1]
+	text = regexp.MustCompile(`var chapterImages = \[(.*?)\]`).FindStringSubmatch(text)[1]
 	mat := regexp.MustCompile(`"(.+?)"`).FindAllStringSubmatch(text, -1)
 	imgs := make([]string, len(mat))
 	for i := range imgs {
