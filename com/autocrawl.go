@@ -62,7 +62,7 @@ func AutoCrawl(csv, output string, frequency, maxRetry uint, log *log.Logger) {
 						select {
 						case <-prg:
 						case err = <-errs:
-							log.Println(err)
+							log.Printf("%s: %s\n", err.Filename, err.Error)
 						case <-done:
 							break progress
 						}
