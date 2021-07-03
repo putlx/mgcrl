@@ -68,7 +68,7 @@ window.addEventListener("load", function () {
 					if (response === "unsupported URL") {
 						toast("该链接不受支持。");
 					} else {
-						toast(`错误：${response}。`);
+						toast(response);
 					}
 				} else {
 					document.getElementById("chapter-list").innerHTML = response
@@ -81,7 +81,7 @@ window.addEventListener("load", function () {
 				}
 			})
 			.catch(error => {
-				toast(`错误：${error.message}。`);
+				toast(error.message);
 				console.log(error);
 			})
 			.finally(() => document.querySelectorAll(".control button").forEach(e => e.disabled = false));
@@ -103,11 +103,11 @@ window.addEventListener("load", function () {
 				.then(response => response.text())
 				.then(response => {
 					if (response) {
-						toast(`错误：${response}。`);
+						toast(response);
 					}
 				})
 				.catch(error => {
-					toast(`错误：${error.message}。`);
+					toast(error.message);
 					console.log(error);
 				})
 				.finally(() => document.querySelectorAll(".control button").forEach(e => e.disabled = false));
@@ -142,14 +142,14 @@ function appendTask(task) {
 			.then(response => response.text())
 			.then(response => {
 				if (response) {
-					toast(`错误：${response}。`);
+					toast(response);
 				} else {
 					task.element.remove();
 					tasks.delete(task.id);
 				}
 			})
 			.catch(error => {
-				toast(`错误：${error.message}。`);
+				toast(error.message);
 				console.log(error);
 			});
 	};

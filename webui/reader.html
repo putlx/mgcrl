@@ -69,7 +69,7 @@
 				.then(response => response.json())
 				.then(response => {
 					if (typeof response === "string") {
-						toast(`错误：${response}。`);
+						toast(response);
 					} else {
 						document.querySelector("#path").innerHTML = response.path;
 						document.querySelector("#files").innerHTML = (response.files || [])
@@ -94,11 +94,11 @@
 										if (response.ok) {
 											get(response.message);
 										} else {
-											toast(`错误：${response.message}。`);
+											toast(response.message);
 										}
 									})
 									.catch(error => {
-										toast(`错误：${error.message}。`);
+										toast(error.message);
 										console.log(error);
 									});
 							}
@@ -106,7 +106,7 @@
 					}
 				})
 				.catch(error => {
-					toast(`错误：${error.message}。`);
+					toast(error.message);
 					console.log(error);
 				});
 		}
